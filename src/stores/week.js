@@ -123,7 +123,7 @@ export const useWeekStore = defineStore('week', {
       this.persist()
       return true
     },
-    /** 修改菜品中某食材克数(实时重算营养) */
+    /** 移除菜品中某食材克数(实时重算营养) */
     updateGrams(date, mealKey, index, foodId, grams) {
       const item = this.days[date]?.[mealKey]?.[index]
       if (!item) return false
@@ -132,6 +132,22 @@ export const useWeekStore = defineStore('week', {
       ing.grams = Math.round(grams)
       this.persist()
       return true
+    },
+    /** 移除所有天中某食谱的全部条目(删除自定义食物时清理餐单引用),返回移除条数 */
+    removeRecipeEverywhere(recipeId) {
+      let removed = 0
+      for (const meals of Object.values(this.days)) {
+        if (!meals) continue
+        for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+          const list = meals[mealKey]
+          if (!list?.length) continue
+          const next = list.filter((it) => !it || it.recipeId !== recipeId)
+          removed += list.length - next.length
+          if (next.length !== list.length) meals[mealKey] = next
+        }
+      }
+      if (removed > 0) this.persist()
+      return removed
     },
     clearAll() {
       this.days = {}

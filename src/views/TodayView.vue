@@ -223,14 +223,16 @@
             />
           </template>
         </van-cell>
-        <van-cell title="做法" />
-        <div class="steps">
-          <ol>
-            <li v-for="(s, i) in detailRecipe?.steps" :key="i">{{ s }}</li>
-          </ol>
-        </div>
+        <template v-if="detailRecipe?.steps?.length">
+          <van-cell title="做法" />
+          <div class="steps">
+            <ol>
+              <li v-for="(s, i) in detailRecipe.steps" :key="i">{{ s }}</li>
+            </ol>
+          </div>
+        </template>
         <div style="display: flex; gap: 10px; margin: 12px 0">
-          <van-button block type="primary" @click="doSwap">
+          <van-button v-if="!detailItem.custom" block type="primary" @click="doSwap">
             换一个{{ SLOT_LABELS[detailItem.slot] }}
           </van-button>
           <van-button block type="danger" plain @click="doRemove">
@@ -256,6 +258,9 @@
                 <template #title>
                   {{ r.name }}
                   <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
+                  <van-tag v-if="r.custom" plain type="primary" size="medium" style="margin-left: 4px">
+                    {{ r.source || '自定义' }}
+                  </van-tag>
                   <van-tag v-if="addSearch.trim() && !r.mealFit.includes(addMealKey)" color="#c8c9cc" size="medium" style="margin-left: 4px">
                     非{{ addMealLabel }}
                   </van-tag>
@@ -345,6 +350,7 @@ import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
+import { useCustomFoodsStore } from '../stores/customFoods'
 import { todayStr, parseDate } from '../utils/date'
 import { TIPS } from '../data/tips'
 
@@ -352,6 +358,8 @@ const profile = useProfileStore()
 const week = useWeekStore()
 const checkin = useCheckinStore()
 const weight = useWeightStore()
+const customFoods = useCustomFoodsStore()
+customFoods.sync() // 注册进 RECIPES_MAP,添加菜品/详情/加餐链路即席可用
 const today = todayStr()
 
 // 按日期轮换,一天一条看完全部
@@ -551,6 +559,7 @@ const addSlots = [
   { value: 'protein', label: '蛋白' },
   { value: 'vegetable', label: '蔬菜' },
   { value: 'fruit', label: '水果' },
+  { value: 'custom', label: '自定义' },
 ]
 
 function openAdd(mealKey) {
@@ -564,14 +573,16 @@ const addMealLabel = computed(() => MEALS.find((m) => m.key === addMealKey.value
 
 function filteredAddRecipes(slot) {
   const kw = addSearch.value.trim()
-  // 默认只列适合该餐次的食谱;有关键词时放开到全库搜索
-  return RECIPES.filter(
+  // 种子食谱 + 自定义食物(伪食谱,slot=custom 不进组装池,只在此手动添加)
+  return allAddRecipes.value.filter(
     (r) =>
       (slot === 'all' || r.slot === slot) &&
       (kw ? true : r.mealFit.includes(addMealKey.value)) &&
       (!kw || r.name.includes(kw))
   )
 }
+
+const allAddRecipes = computed(() => RECIPES.concat(customFoods.recipes))
 
 function baseKcal(recipe) {
   return computeNutrition(recipe.ingredients, FOODS_MAP).kcal

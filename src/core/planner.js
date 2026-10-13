@@ -18,6 +18,7 @@ export const SLOT_LABELS = {
   protein: '蛋白',
   vegetable: '蔬菜',
   fruit: '水果',
+  custom: '自定义',
 }
 
 const S_MIN = 0.3
@@ -266,6 +267,7 @@ export function buildShoppingList(days, foods) {
     for (const items of Object.values(meals)) {
       for (const item of items || []) {
         if (!item) continue
+        if (item.custom) continue // 自定义食物不进备货清单(典型场景是已购单品)
         for (const ing of item.ingredients) {
           today.set(ing.foodId, (today.get(ing.foodId) || 0) + ing.grams)
         }
@@ -344,7 +346,13 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
     }
     return 'merged'
   }
-  list.push({ recipeId: recipe.id, slot: recipe.slot, ingredients: ings })
+  list.push({
+    recipeId: recipe.id,
+    slot: recipe.slot,
+    // 自定义食物带标记:详情层隐藏"换一个",采购清单跳过(多为已购单品)
+    ...(recipe.custom ? { custom: true } : {}),
+    ingredients: ings,
+  })
   return 'added'
 }
 

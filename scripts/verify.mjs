@@ -285,5 +285,79 @@ check('带克数添加(4个鸡蛋=200g)', (() => {
   return r === 'added' && meals4.lunch[0].ingredients[0].grams === 200
 })())
 
+// ---------- 16. 营养成分表解析(labelScan)与自定义食物 ----------
+const { parseNutritionLabel, normalizeTo100g, kjToKcal } = await import('../src/core/labelScan.js')
+
+const label100g = `营养成分表
+项目 每100g NRV%
+能量 1600千焦 19%
+蛋白质 8.0克 13%
+脂肪 15.2克 25%
+碳水化合物 62.0克 21%
+钠 400毫克 20%`
+const p1 = parseNutritionLabel(label100g)
+check('成分表:识别每100g口径', p1?.basis === '100g', JSON.stringify(p1))
+check('成分表:能量/三大营养素提取(NRV% 不干扰)', p1?.energyKj === 1600 && p1?.protein === 8 && p1?.carbs === 62 && p1?.fat === 15.2, JSON.stringify(p1))
+check('kJ→kcal 换算', kjToKcal(1600) === 382.4, `got ${kjToKcal(1600)}`)
+const n1 = normalizeTo100g(p1)
+check('每100g 归一不改变数值', n1.kcal === 382.4 && n1.protein === 8 && n1.fat === 15.2)
+
+const labelServe = `营养成分表 每份30g
+能量 500kJ 6%
+蛋白质 3.0g 5%
+脂肪 4.5g 8%
+碳水化合物 22.5g 8%`
+const p2 = parseNutritionLabel(labelServe)
+check('成分表:识别每份口径与克数', p2?.basis === 'perServe' && p2?.perServeGrams === 30, JSON.stringify(p2))
+const n2 = normalizeTo100g(p2)
+check('每份30g 归一到每100g(×100/30)', n2?.protein === 10 && n2?.carbs === 75 && n2?.fat === 15 && n2?.kcal === 398.3, JSON.stringify(n2))
+const p2b = parseNutritionLabel('每份\n能量 500kJ\n蛋白质 3.0g\n脂肪 4.5g\n碳水化合物 22.5g')
+check('每份缺克数时归一返回 null(走人工补填)', normalizeTo100g(p2b) === null && normalizeTo100g(p2b, 25)?.protein === 12)
+
+const p3 = parseNutritionLabel('每100ml\n能量 180千焦\n蛋白质 3.2g\n脂肪 3.5g\n碳水化合物 4.8g')
+check('每100mL 口径按 1:1 近似', p3?.basis === '100ml' && normalizeTo100g(p3)?.protein === 3.2)
+
+const p4 = parseNutritionLabel(`能量 1600千焦 19%
+蛋白质 8.0克 13%
+饱和脂肪 3.0克
+反式脂肪 0克`)
+check('细分脂肪行不误取主行:反式/饱和不抢主行,仅退化时取饱和', p4?.fat === 3 && p4?.carbs === null, JSON.stringify(p4))
+check('垃圾文本返回 null(走纯手填)', parseNutritionLabel('随便一段话,没有营养数值') === null)
+
+// 真实 OCR 输出样本:中文逐字识别带字间空格、"千焦"认成"干焦"、数字前混入智能引号
+const labelOcr = `营养 成 分 表
+项 目 每 100g NRV%
+能 量 1600 干 焦 19%
+蛋白 质 ”8.0 克 13%
+脂肪 15.2 克 25%
+碳水 化 合 物 62.0 克 21%
+钠 400 毫 克 20%`
+const p5 = parseNutritionLabel(labelOcr)
+check('OCR 噪声样本(字间空格/干焦/引号)仍可解析', p5?.energyKj === 1600 && p5?.protein === 8 && p5?.carbs === 62 && p5?.fat === 15.2, JSON.stringify(p5))
+
+// 自定义食物伪食谱与既有链路
+const { buildCustomRecipe } = await import('../src/stores/customFoods.js')
+const cfFood = { id: 'cf_verify', name: '测试面包', kcal: 250, protein: 9, carbs: 45, fat: 4, source: '山姆' }
+const cfRecipe = buildCustomRecipe(cfFood)
+const crOk =
+  cfRecipe.slot === 'custom' &&
+  cfRecipe.custom === true &&
+  cfRecipe.mealFit.length === 3 &&
+  cfRecipe.ingredients[0].grams === 100
+check('伪食谱:槽位 custom/三餐可用/基准份100g', crOk, JSON.stringify(cfRecipe))
+check('组装池(种子 RECIPES)不含 custom 槽位', RECIPES.every((r) => r.slot !== 'custom'))
+
+// 注册进 MAP 后,营养计算/加餐累加/采购清单隔离走既有链路
+FOODS_MAP['cf_verify'] = cfFood
+const cfNutrition = computeNutrition(cfRecipe.ingredients, FOODS_MAP)
+check('伪食谱营养 = 食物每百克数值', cfNutrition.kcal === 250 && cfNutrition.protein === 9, JSON.stringify(cfNutrition))
+const meals5 = { breakfast: [] }
+addItemToMeal(meals5, 'breakfast', cfRecipe, [{ foodId: 'cf_verify', grams: 120, scalable: true }])
+const addedCustom = meals5.breakfast[0]
+check('加餐条目带 custom 标记', addedCustom?.custom === true && addedCustom?.ingredients[0].grams === 120)
+const shoppingWithCustom = buildShoppingList({ '2026-10-13': meals5 }, FOODS_MAP)
+check('自定义食物不进采购清单', shoppingWithCustom.length === 0, JSON.stringify(shoppingWithCustom))
+delete FOODS_MAP['cf_verify']
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

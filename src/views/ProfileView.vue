@@ -208,6 +208,7 @@ import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useWeightStore } from '../stores/weight'
 import { useCheckinStore } from '../stores/checkin'
+import { useCustomFoodsStore } from '../stores/customFoods'
 import { exportAll, importFile, removeState } from '../utils/storage'
 import { TIPS } from '../data/tips'
 
@@ -215,6 +216,7 @@ const profile = useProfileStore()
 const plan = useWeekStore()
 const weight = useWeightStore()
 const checkin = useCheckinStore()
+const customFoods = useCustomFoodsStore()
 const activeTips = ref([])
 
 const weightDesc = computed(() => [...weight.records].reverse())
@@ -379,12 +381,13 @@ const fileInput = ref(null)
 
 function doExport() {
   exportAll({
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     profile: profile.$state,
     week: { weekStart: plan.weekStart, days: plan.days },
     checkin: checkin.$state,
     weight: weight.$state,
+    customFoods: customFoods.$state,
   })
   showToast('已导出')
 }
@@ -409,6 +412,10 @@ async function onImportFile(e) {
     }
     if (data.checkin) saveState('checkin', data.checkin)
     if (data.weight?.records) saveState('weight', data.weight)
+    // v3 起含自定义食物;v2 及更早备份没有该层,导入为空不报错
+    if (Array.isArray(data.customFoods?.foods)) {
+      saveState('customFoods', { foods: data.customFoods.foods, sources: data.customFoods.sources || [] })
+    }
     showToast('导入成功,即将刷新')
     setTimeout(() => window.location.reload(), 800)
   } catch (err) {
@@ -420,7 +427,7 @@ async function onImportFile(e) {
 
 async function doReset() {
   try {
-    await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置、周计划、打卡与体重记录,确定?' })
+    await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置、周计划、打卡、体重记录与自定义食物,确定?' })
   } catch {
     return
   }
@@ -428,6 +435,7 @@ async function doReset() {
   plan.clearAll()
   checkin.clear()
   weight.clear()
+  customFoods.clear()
   removeState('plan') // v0.1 遗留的单日 plan key,防止日后经迁移逻辑"复活"
   window.location.reload()
 }
