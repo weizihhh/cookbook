@@ -212,5 +212,16 @@ const fullList = buildShoppingList(weekPlan, FOODS_MAP)
 check('整周清单条目合理(10-90 种)', fullList.length >= 10 && fullList.length <= 90, `got ${fullList.length}`)
 check('清单含蛋白质类食材', fullList.some((f) => f.category === 'meat' || f.category === 'seafood'))
 
+// ---------- 10. 抗炎标注 ----------
+const antiFoods = FOODS.filter((f) => f.antiInfl)
+check('抗炎食材数量合理(40-90)', antiFoods.length >= 40 && antiFoods.length <= 90, `got ${antiFoods.length}`)
+const antiRecipes = RECIPES.filter((r) => r.antiInfl)
+const antiSlots = new Set(antiRecipes.map((r) => r.slot))
+check('抗炎食谱存在且覆盖多槽位', antiRecipes.length >= 15 && antiSlots.size >= 4, `got ${antiRecipes.length} 个,槽位 ${[...antiSlots].join(',')}`)
+// 派生规则抽查:单品西兰花(200g 抗炎主料)应标;白灼虾(无抗炎食材)不应标
+check('水煮西兰花应为抗炎', RECIPES_MAP['r_broccoli_boiled']?.antiInfl === true)
+check('白灼虾应不标抗炎', RECIPES_MAP['r_boiled_shrimp']?.antiInfl === false)
+check('清蒸三文鱼应为抗炎', RECIPES_MAP['r_pan_fried_salmon']?.antiInfl === true)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

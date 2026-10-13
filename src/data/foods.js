@@ -14,7 +14,7 @@ export const FOOD_CATEGORIES = [
 ]
 
 // { id, name, category, kcal, protein, carbs, fat }  —— 营养均为每100g
-export const FOODS = [
+const RAW_FOODS = [
   // ---------- 谷物主食 ----------
   { id: 'f_rice', name: '大米(生)', category: 'grain', kcal: 346, protein: 7.4, carbs: 77.9, fat: 0.8 },
   { id: 'f_brown_rice', name: '糙米(生)', category: 'grain', kcal: 348, protein: 7.7, carbs: 75.0, fat: 2.7 },
@@ -182,5 +182,36 @@ export const FOODS = [
   { id: 'f_pistachio', name: '开心果', category: 'oil_nuts', kcal: 562, protein: 20.0, carbs: 21.0, fat: 45.0 },
   { id: 'f_pumpkin_seed', name: '南瓜子仁', category: 'oil_nuts', kcal: 574, protein: 33.0, carbs: 10.0, fat: 49.0 },
 ]
+
+// 抗炎食材标注:参照抗炎饮食研究共识(如膳食炎症指数 DII 相关研究)的近似归类,
+// 覆盖 omega-3 鱼类、浆果与深色水果、十字花科、菌菇海藻、全谷豆类、
+// 特定油脂坚果等证据较充分的品类;为生活方式参考,不作医疗建议。
+const ANTI_INFLAMMATORY_IDS = new Set([
+  // 全谷物与杂豆
+  'f_oats', 'f_brown_rice', 'f_millet', 'f_quinoa', 'f_black_glutinous_rice',
+  'f_sorghum', 'f_buckwheat_noodle', 'f_whole_wheat_flour',
+  'f_red_bean_dry', 'f_mung_bean_dry',
+  // 薯类(深色/黏多糖)
+  'f_sweet_potato', 'f_purple_potato', 'f_yam', 'f_pumpkin',
+  // 富 omega-3 / 海鱼
+  'f_salmon', 'f_cod', 'f_bass', 'f_hairtail', 'f_tuna_canned',
+  // 豆制品与发酵乳
+  'f_yogurt_plain', 'f_soy_milk', 'f_tofu_firm', 'f_tofu_soft', 'f_tofu_dried',
+  'f_yuba', 'f_soybean_dry', 'f_black_bean_dry', 'f_chickpea_cooked', 'f_edamame',
+  // 十字花科与深绿叶
+  'f_broccoli', 'f_cauliflower', 'f_cabbage', 'f_chinese_cabbage', 'f_baby_cabbage',
+  'f_white_radish', 'f_spinach', 'f_amaranth', 'f_shepherd_s_purse',
+  // 其他蔬果菌藻
+  'f_asparagus', 'f_tomato', 'f_bell_pepper', 'f_onion', 'f_carrot',
+  'f_shiitake', 'f_mushroom', 'f_enoki', 'f_king_oyster', 'f_oyster_mushroom',
+  'f_wood_ear', 'f_kelp', 'f_laver',
+  // 水果(浆果/高多酚)
+  'f_blueberry', 'f_strawberry', 'f_cherry', 'f_kiwi', 'f_orange', 'f_mandarin',
+  'f_pomegranate', 'f_apple', 'f_grape', 'f_cherry_tomato', 'f_avocado',
+  // 油脂坚果
+  'f_olive_oil', 'f_flaxseed_oil', 'f_walnut', 'f_almond',
+])
+
+export const FOODS = RAW_FOODS.map((f) => ({ ...f, antiInfl: ANTI_INFLAMMATORY_IDS.has(f.id) }))
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))

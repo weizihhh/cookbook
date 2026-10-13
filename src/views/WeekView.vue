@@ -84,7 +84,10 @@
     <!-- 菜品详情弹层 -->
     <van-popup v-model:show="detailShow" position="bottom" round :style="{ maxHeight: '75%' }">
       <div v-if="detailItem" class="detail">
-        <div class="detail-title">{{ recipeName(detailItem.recipeId) }}</div>
+        <div class="detail-title">
+          {{ recipeName(detailItem.recipeId) }}
+          <van-tag v-if="detailRecipe?.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+        </div>
         <div class="nutri-grid" style="margin-bottom: 12px">
           <div><div class="num">{{ detailNutrition.kcal }}</div><div class="label">千卡</div></div>
           <div><div class="num">{{ detailNutrition.protein }}g</div><div class="label">蛋白质</div></div>

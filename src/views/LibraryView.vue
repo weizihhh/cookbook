@@ -12,6 +12,7 @@
             <template #title>
               {{ r.name }}
               <span class="fit">{{ fitText(r) }}</span>
+              <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
             </template>
             <template #label>
               <van-tag
@@ -45,11 +46,14 @@
             :key="f.id"
             :title="f.name"
           >
+            <template #label>
+              每 100g
+              <van-tag v-if="f.antiInfl" color="#07c160" size="medium" style="margin-left: 2px">抗炎</van-tag>
+            </template>
             <template #value>
               <div>{{ f.kcal }} 千卡</div>
               <div class="sub">P{{ f.protein }} · C{{ f.carbs }} · F{{ f.fat }}</div>
             </template>
-            <template #label>每 100g</template>
           </van-cell>
         </van-cell-group>
       </van-tab>
@@ -58,7 +62,10 @@
     <!-- 食谱详情 -->
     <van-popup v-model:show="recipeShow" position="bottom" round :style="{ maxHeight: '75%' }">
       <div v-if="current" class="detail">
-        <div class="detail-title">{{ current.name }}</div>
+        <div class="detail-title">
+          {{ current.name }}
+          <van-tag v-if="current.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+        </div>
         <div class="nutri-grid" style="margin-bottom: 12px">
           <div><div class="num">{{ baseNutrition(current).kcal }}</div><div class="label">千卡/基准份</div></div>
           <div><div class="num">{{ baseNutrition(current).protein }}g</div><div class="label">蛋白质</div></div>
@@ -78,7 +85,10 @@
             <li v-for="(s, i) in current.steps" :key="i">{{ s }}</li>
           </ol>
         </div>
-        <div class="hint">加入今日计划时会按你的目标热量自动调整可缩放食材的克数。</div>
+        <div class="hint">
+          抗炎标注参照抗炎饮食研究共识(如膳食炎症指数 DII)近似归类,属生活方式参考,不作医疗建议。
+          加入今日计划时会按你的目标热量自动调整可缩放食材的克数。
+        </div>
       </div>
     </van-popup>
   </div>
@@ -97,11 +107,14 @@ const slots = [
   { value: 'protein', label: '蛋白' },
   { value: 'vegetable', label: '蔬菜' },
   { value: 'fruit', label: '水果' },
+  { value: 'anti', label: '抗炎' },
 ]
 const activeTab = ref(0)
 
 function recipesOf(slot) {
-  return slot === 'all' ? RECIPES : RECIPES.filter((r) => r.slot === slot)
+  if (slot === 'all') return RECIPES
+  if (slot === 'anti') return RECIPES.filter((r) => r.antiInfl)
+  return RECIPES.filter((r) => r.slot === slot)
 }
 function foodsOf(cat) {
   return FOODS.filter((f) => f.category === cat)

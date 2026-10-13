@@ -7,7 +7,9 @@
 // - 调味料不进入食材表,写在做法里;油计入食材(对减脂热量影响显著)
 
 // { id, name, slot, mealFit, tags, ingredients: [{foodId, grams, scalable}], steps }
-export const RECIPES = [
+import { FOODS_MAP } from './foods.js'
+
+const RAW_RECIPES = [
   // ================= 主食(staple) =================
   {
     id: 'r_rice', name: '白米饭', slot: 'staple', mealFit: ['lunch', 'dinner'], tags: [],
@@ -1067,5 +1069,17 @@ export const RECIPES = [
   { id: 'r_pomegranate', name: '石榴一个', slot: 'fruit', mealFit: ['breakfast'], tags: [],
     ingredients: [{ foodId: 'f_pomegranate', grams: 200, scalable: false }], steps: ['切块剥籽吃'] },
 ]
+
+// 食谱抗炎派生:含 ≥2 种抗炎食材(油也计入,如"橄榄油+菠菜"),
+// 或含 ≥80g 非油抗炎主料(如 200g 西兰花单品)即标注
+const OIL_IDS = new Set(['f_olive_oil', 'f_peanut_oil', 'f_flaxseed_oil'])
+
+export const RECIPES = RAW_RECIPES.map((r) => {
+  const antiIngs = r.ingredients.filter((i) => FOODS_MAP[i.foodId]?.antiInfl)
+  const mainAntiGrams = antiIngs
+    .filter((i) => !OIL_IDS.has(i.foodId))
+    .reduce((s, i) => s + i.grams, 0)
+  return { ...r, antiInfl: antiIngs.length >= 2 || mainAntiGrams >= 80 }
+})
 
 export const RECIPES_MAP = Object.fromEntries(RECIPES.map((r) => [r.id, r]))
