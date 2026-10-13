@@ -55,6 +55,7 @@
               :show-pivot="false"
               :color="m.color"
               track-color="#eef2f0"
+              rounded
             />
           </div>
           <div v-if="hasSkippedMeal" class="skip-note">已跳过的餐次不计入上方合计</div>
@@ -145,18 +146,18 @@
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
           <div class="meal-actions">
-            <van-button size="small" plain type="primary" @click="openAdd(meal.key)">
+            <van-button size="small" round plain type="primary" @click="openAdd(meal.key)">
               + 添加菜品
             </van-button>
-            <van-button size="small" plain type="primary" @click="openCheckin(meal.key)">
+            <van-button size="small" round plain type="primary" @click="openCheckin(meal.key)">
               打卡 · {{ checkinText(meal.key) }}
             </van-button>
           </div>
         </van-cell-group>
 
         <div style="display: flex; gap: 10px">
-          <van-button block type="primary" plain @click="generate">重新生成</van-button>
-          <van-button block type="danger" plain @click="clearToday">清空</van-button>
+          <van-button block round type="primary" plain @click="generate">重新生成</van-button>
+          <van-button block round type="danger" plain @click="clearToday">清空</van-button>
         </div>
       </template>
 
@@ -839,9 +840,9 @@ function ingredientText(item) {
 }
 .slot-chip {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 2px 8px;
   margin-right: 6px;
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--cb-primary-light);
   color: var(--cb-primary);
   font-size: 10px;
@@ -863,9 +864,9 @@ function ingredientText(item) {
 }
 .weight-input {
   flex: 0 0 110px;
-  padding: 6px 10px;
+  padding: 6px 14px;
   background: #f7f8fa;
-  border-radius: 6px;
+  border-radius: 999px;
 }
 .trend {
   flex: 1;

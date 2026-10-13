@@ -86,7 +86,7 @@
       <div v-if="detailItem" class="detail">
         <div class="detail-title">
           {{ recipeName(detailItem.recipeId) }}
-          <van-tag v-if="detailRecipe?.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+          <van-tag v-if="detailRecipe?.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
         </div>
         <div class="nutri-grid" style="margin-bottom: 12px">
           <div><div class="num">{{ detailNutrition.kcal }}</div><div class="label">千卡</div></div>
@@ -318,12 +318,13 @@ function gramsToJin(g) {
   color: #969799;
 }
 .slot-tag {
-  font-size: 11px;
-  color: #1989fa;
-  border: 1px solid #1989fa;
-  border-radius: 3px;
-  padding: 0 3px;
+  font-size: 10px;
+  color: var(--cb-primary);
+  background: var(--cb-primary-light);
+  border-radius: 999px;
+  padding: 2px 8px;
   margin-right: 6px;
+  vertical-align: 1px;
 }
 .kcal {
   font-size: 12px;

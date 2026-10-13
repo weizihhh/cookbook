@@ -4,7 +4,7 @@
   --cb-primary-light: #e8f8f1;
   --cb-text: #1f2d27;
   --cb-bg: #f5f7f6;
-  --cb-card-radius: 14px;
+  --cb-card-radius: 22px;
 
   /* Vant 主题变量:按钮/标签/进度/底部导航等全局跟随主色 */
   --van-primary-color: var(--cb-primary);
@@ -42,6 +42,16 @@ body {
 /* 卡片轻投影,配合圆角营造清爽卡片感 */
 .van-cell-group--inset {
   box-shadow: 0 1px 4px rgba(31, 45, 39, 0.05);
+}
+
+/* 全局按钮胶囊化(含记录/保存设置/弹层按钮等) */
+.van-button {
+  border-radius: 999px;
+}
+
+/* 全局标签胶囊化(餐次/槽位/抗炎/渠道筛选等) */
+.van-tag {
+  border-radius: 999px;
 }
 
 .nutri-grid {

@@ -12,7 +12,7 @@
             <template #title>
               {{ r.name }}
               <span class="fit">{{ fitText(r) }}</span>
-              <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
+              <van-tag v-if="r.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 4px">抗炎</van-tag>
             </template>
             <template #label>
               <van-tag
@@ -49,7 +49,7 @@
             <template #label>
               每 100g
               <span v-if="f.unit" class="unit-hint">· 1{{ f.unit }}≈{{ f.unitGrams }}g</span>
-              <van-tag v-if="f.antiInfl" color="#07c160" size="medium" style="margin-left: 2px">抗炎</van-tag>
+              <van-tag v-if="f.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 2px">抗炎</van-tag>
             </template>
             <template #value>
               <div>{{ f.kcal }} 千卡</div>
@@ -109,7 +109,7 @@
       <div v-if="current" class="detail">
         <div class="detail-title">
           {{ current.name }}
-          <van-tag v-if="current.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+          <van-tag v-if="current.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
         </div>
         <div class="nutri-grid" style="margin-bottom: 12px">
           <div><div class="num">{{ baseNutrition(current).kcal }}</div><div class="label">千卡/基准份</div></div>
