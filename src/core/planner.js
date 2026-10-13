@@ -306,6 +306,15 @@ export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, t
   return { recipeId: recipe.id, slot, ingredients: recipe.ingredients.map((ing) => ({ ...ing })) }
 }
 
+/** 基准份 planItem(自定义添加菜品用):按食谱基准克数,不按目标缩放 */
+export function makeBaselineItem(recipe) {
+  return {
+    recipeId: recipe.id,
+    slot: recipe.slot,
+    ingredients: recipe.ingredients.map((ing) => ({ ...ing })),
+  }
+}
+
 /** 汇总全天营养与目标偏差 */
 export function summarizeDay(dayPlan, foods, targets) {
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }

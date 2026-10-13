@@ -245,5 +245,17 @@ const cutPreset = MACRO_PRESETS.find((p) => p.value === 'cut')
 const tCut = calcTargets({ gender: 'male', age: 30, height: 175, weight: 70, activity: 1.375, mode: 'cut', proteinPerKg: cutPreset.proteinPerKg, fatRatio: cutPreset.fatRatio })
 check('减脂预设蛋白 = 2.0g/kg × 70 = 140g', Math.abs(tCut.protein - 140) < 0.01, `got ${tCut.protein}`)
 
+// ---------- 13. 自定义编辑(基准份构造) ----------
+const { makeBaselineItem } = await import('../src/core/planner.js')
+const baseline = makeBaselineItem(RECIPES_MAP['r_pan_fried_chicken'])
+const baseOk =
+  baseline.recipeId === 'r_pan_fried_chicken' &&
+  baseline.slot === 'protein' &&
+  baseline.ingredients.length === RECIPES_MAP['r_pan_fried_chicken'].ingredients.length &&
+  baseline.ingredients[0].grams === 150 // 基准克数,未缩放
+check('makeBaselineItem 返回基准份且不缩放', baseOk, JSON.stringify(baseline))
+const baselineNutrition = computeNutrition(baseline.ingredients, FOODS_MAP)
+check('基准份营养 = 150g鸡胸+5g油 ≈ 244千卡', baselineNutrition.kcal === 244, `got ${baselineNutrition.kcal}`)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

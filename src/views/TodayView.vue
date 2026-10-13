@@ -151,6 +151,12 @@
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
           <van-cell
+            title="+ 添加菜品"
+            is-link
+            center
+            @click="openAdd(meal.key)"
+          />
+          <van-cell
             title="打卡"
             is-link
             :value="checkinText(meal.key)"
@@ -184,26 +190,65 @@
           <div><div class="num">{{ detailNutrition.fat }}g</div><div class="label">脂肪</div></div>
         </div>
         <van-cell title="食材用量" />
-        <van-cell
-          v-for="ing in detailItem.ingredients"
-          :key="ing.foodId"
-          :title="FOODS_MAP[ing.foodId]?.name"
-          :value="ing.grams + 'g'"
-        />
+        <van-cell v-for="ing in detailItem.ingredients" :key="ing.foodId">
+          <template #title>
+            {{ FOODS_MAP[ing.foodId]?.name }}
+          </template>
+          <template #value>
+            <van-stepper
+              :model-value="ing.grams"
+              :min="5"
+              :max="1000"
+              :step="5"
+              integer
+              input-width="44px"
+              button-size="24px"
+              @change="(v) => onGramsChange(ing.foodId, v)"
+            />
+          </template>
+        </van-cell>
         <van-cell title="做法" />
         <div class="steps">
           <ol>
             <li v-for="(s, i) in detailRecipe?.steps" :key="i">{{ s }}</li>
           </ol>
         </div>
-        <van-button
-          block
-          type="primary"
-          style="margin: 12px 0"
-          @click="doSwap"
-        >
-          换一个{{ SLOT_LABELS[detailItem.slot] }}
-        </van-button>
+        <div style="display: flex; gap: 10px; margin: 12px 0">
+          <van-button block type="primary" @click="doSwap">
+            换一个{{ SLOT_LABELS[detailItem.slot] }}
+          </van-button>
+          <van-button block type="danger" plain @click="doRemove">
+            移除此菜
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 添加菜品弹层 -->
+    <van-popup v-model:show="addShow" position="bottom" round :style="{ height: '72%' }">
+      <div class="add-panel">
+        <van-search v-model="addSearch" placeholder="搜索食谱,如:鸡胸、豆腐" />
+        <van-tabs v-model:active="addTab" shrink>
+          <van-tab v-for="s in addSlots" :key="s.value" :title="s.label">
+            <div class="add-list">
+              <van-cell
+                v-for="r in filteredAddRecipes(s.value)"
+                :key="r.id"
+                is-link
+                @click="doAdd(r)"
+              >
+                <template #title>
+                  {{ r.name }}
+                  <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
+                </template>
+                <template #value>
+                  <span class="add-kcal">{{ baseKcal(r) }} 千卡/基准份</span>
+                </template>
+              </van-cell>
+              <van-empty v-if="!filteredAddRecipes(s.value).length" image-size="60" description="没有匹配的食谱" />
+            </div>
+          </van-tab>
+        </van-tabs>
       </div>
     </van-popup>
 
@@ -224,7 +269,7 @@ import { showToast } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
 import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { FOODS_MAP } from '../data/foods'
-import { RECIPES_MAP } from '../data/recipes'
+import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
@@ -362,6 +407,59 @@ function doSwap() {
   detailShow.value = false
 }
 
+// ---- 详情编辑:改克数 / 移除 ----
+function onGramsChange(foodId, v) {
+  week.updateGrams(today, detailMealKey.value, detailIndex.value, foodId, v)
+}
+
+function doRemove() {
+  week.removeItem(today, detailMealKey.value, detailIndex.value)
+  detailShow.value = false
+  showToast('已移除')
+}
+
+// ---- 添加菜品 ----
+const addShow = ref(false)
+const addMealKey = ref('')
+const addSearch = ref('')
+const addTab = ref(0)
+const addSlots = [
+  { value: 'all', label: '全部' },
+  { value: 'staple', label: '主食' },
+  { value: 'protein', label: '蛋白' },
+  { value: 'vegetable', label: '蔬菜' },
+  { value: 'fruit', label: '水果' },
+]
+
+function openAdd(mealKey) {
+  addMealKey.value = mealKey
+  addSearch.value = ''
+  addShow.value = true
+}
+
+function filteredAddRecipes(slot) {
+  const kw = addSearch.value.trim()
+  // 默认只列适合该餐次的食谱;有关键词时放开到全库搜索
+  return RECIPES.filter(
+    (r) =>
+      (slot === 'all' || r.slot === slot) &&
+      (kw ? true : r.mealFit.includes(addMealKey.value)) &&
+      (!kw || r.name.includes(kw))
+  )
+}
+
+function baseKcal(recipe) {
+  return computeNutrition(recipe.ingredients, FOODS_MAP).kcal
+}
+
+function doAdd(recipe) {
+  const ok = week.addItem(today, addMealKey.value, recipe.id)
+  if (ok) {
+    showToast(`已添加:${recipe.name}`)
+    addShow.value = false
+  }
+}
+
 // ---- 列表辅助 ----
 function recipeName(id) {
   return RECIPES_MAP[id]?.name || id
@@ -457,6 +555,21 @@ function ingredientText(item) {
   font-size: 13px;
   color: #646566;
   line-height: 1.7;
+}
+.add-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.add-list {
+  max-height: calc(72vh - 140px);
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+.add-kcal {
+  font-size: 12px;
+  color: #969799;
 }
 .detail {
   padding: 16px;

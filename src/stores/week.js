@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
-import { RECIPES } from '../data/recipes'
+import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, generateWeekPlan, swapSlotItem, summarizeDay } from '../core/planner'
+import { generateDayPlan, generateWeekPlan, swapSlotItem, makeBaselineItem, summarizeDay } from '../core/planner'
 import { useProfileStore } from './profile'
 import { loadState, saveState } from '../utils/storage'
 import { todayStr, weekStartOf, addDays } from '../utils/date'
@@ -99,6 +99,34 @@ export const useWeekStore = defineStore('week', {
     clearDay(date) {
       delete this.days[date]
       this.persist()
+    },
+    // ---- 自定义编辑:添加/移除菜品、改克数(记录实际进食) ----
+    /** 添加菜品(基准份,不按目标缩放) */
+    addItem(date, mealKey, recipeId) {
+      const meals = this.days[date]
+      const recipe = RECIPES_MAP[recipeId]
+      if (!meals || !recipe) return false
+      meals[mealKey].push(makeBaselineItem(recipe))
+      this.persist()
+      return true
+    },
+    /** 移除某餐第 index 个菜品 */
+    removeItem(date, mealKey, index) {
+      const meals = this.days[date]
+      if (!meals || !meals[mealKey] || index < 0 || index >= meals[mealKey].length) return false
+      meals[mealKey].splice(index, 1)
+      this.persist()
+      return true
+    },
+    /** 修改菜品中某食材克数(实时重算营养) */
+    updateGrams(date, mealKey, index, foodId, grams) {
+      const item = this.days[date]?.[mealKey]?.[index]
+      if (!item) return false
+      const ing = item.ingredients.find((i) => i.foodId === foodId)
+      if (!ing || !(grams >= 5 && grams <= 1000)) return false
+      ing.grams = Math.round(grams)
+      this.persist()
+      return true
     },
     clearAll() {
       this.days = {}
