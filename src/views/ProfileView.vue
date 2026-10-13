@@ -128,6 +128,25 @@
       <van-button round block type="primary" @click="save">保存设置</van-button>
     </div>
 
+    <van-cell-group inset title="体重记录">
+      <van-cell
+        v-for="(r, i) in weightDesc"
+        :key="r.date"
+        :title="r.date"
+        :value="`${r.kg} kg`"
+      >
+        <template #label>
+          <span v-if="i < weightDesc.length - 1 && weightDesc[i + 1]" :class="changeClass(r.kg - weightDesc[i + 1].kg)">
+            较上次 {{ r.kg - weightDesc[i + 1].kg > 0 ? '+' : '' }}{{ (r.kg - weightDesc[i + 1].kg).toFixed(1) }} kg
+          </span>
+        </template>
+        <template #right-icon>
+          <van-icon name="delete-o" class="del-icon" @click="removeWeight(r.date)" />
+        </template>
+      </van-cell>
+      <van-cell v-if="!weightDesc.length" title="暂无记录" label="在今日页快捷记录体重" />
+    </van-cell-group>
+
     <van-cell-group inset title="数据管理">
       <van-cell title="导出数据" is-link @click="doExport" />
       <van-cell title="导入数据" is-link @click="triggerImport" />
@@ -154,11 +173,24 @@ import {
   calcTargets,
 } from '../core/nutrition'
 import { useProfileStore } from '../stores/profile'
-import { usePlanStore } from '../stores/plan'
+import { useWeekStore } from '../stores/week'
+import { useWeightStore } from '../stores/weight'
+import { useCheckinStore } from '../stores/checkin'
 import { exportAll, importFile } from '../utils/storage'
 
 const profile = useProfileStore()
-const plan = usePlanStore()
+const plan = useWeekStore()
+const weight = useWeightStore()
+const checkin = useCheckinStore()
+
+const weightDesc = computed(() => [...weight.records].reverse())
+function changeClass(diff) {
+  return diff <= 0 ? 'chg-down' : 'chg-up'
+}
+function removeWeight(date) {
+  weight.remove(date)
+  showToast('已删除')
+}
 
 // 表单本地副本,保存时才写入 store
 const form = reactive({
@@ -259,10 +291,12 @@ const fileInput = ref(null)
 
 function doExport() {
   exportAll({
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     profile: profile.$state,
-    plan: { date: plan.date, meals: plan.meals },
+    week: { weekStart: plan.weekStart, days: plan.days },
+    checkin: checkin.$state,
+    weight: weight.$state,
   })
   showToast('已导出')
 }
@@ -278,10 +312,15 @@ async function onImportFile(e) {
     const data = await importFile(file)
     if (!data?.profile) throw new Error('缺少 profile 数据')
     profile.update(data.profile)
-    if (data.plan?.meals) {
-      const { saveState } = await import('../utils/storage')
-      saveState('plan', data.plan)
+    const { saveState } = await import('../utils/storage')
+    if (data.week?.days) saveState('week', data.week)
+    // 兼容 v0.1 备份的单日 plan 字段
+    else if (data.plan?.meals) {
+      const { weekStartOf } = await import('../utils/date')
+      saveState('week', { weekStart: weekStartOf(data.plan.date), days: { [data.plan.date]: data.plan.meals } })
     }
+    if (data.checkin) saveState('checkin', data.checkin)
+    if (data.weight?.records) saveState('weight', data.weight)
     showToast('导入成功,即将刷新')
     setTimeout(() => window.location.reload(), 800)
   } catch (err) {
@@ -293,12 +332,14 @@ async function onImportFile(e) {
 
 async function doReset() {
   try {
-    await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置和今日计划,确定?' })
+    await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置、周计划、打卡与体重记录,确定?' })
   } catch {
     return
   }
   profile.reset()
-  plan.clear()
+  plan.clearAll()
+  checkin.clear()
+  weight.clear()
   window.location.reload()
 }
 </script>
@@ -320,6 +361,19 @@ async function doReset() {
 }
 .tags {
   padding: 10px 12px;
+}
+.chg-down {
+  color: #07c160;
+  font-size: 11px;
+}
+.chg-up {
+  color: #ff976a;
+  font-size: 11px;
+}
+.del-icon {
+  font-size: 16px;
+  color: #969799;
+  padding: 4px 2px;
 }
 :deep(.em) {
   color: #1989fa;

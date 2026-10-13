@@ -1,10 +1,19 @@
 // 核心算法验证:npm run verify
 // 覆盖:BMR/TDEE 公式手算对照、食谱食材引用完整性、随机组装收敛性、
-// 排除过滤、换菜。生成结果含随机性,连续跑可观察稳定性。
+// 排除过滤、换菜、周计划生成、采购清单聚合、日期工具。生成结果含随机性,
+// 连续跑可观察稳定性。
 import { calcTargets } from '../src/core/nutrition.js'
-import { generateDayPlan, summarizeDay, computeNutrition, swapSlotItem } from '../src/core/planner.js'
+import {
+  generateDayPlan,
+  generateWeekPlan,
+  buildShoppingList,
+  summarizeDay,
+  computeNutrition,
+  swapSlotItem,
+} from '../src/core/planner.js'
 import { FOODS, FOODS_MAP } from '../src/data/foods.js'
 import { RECIPES, RECIPES_MAP } from '../src/data/recipes.js'
+import { addDays, weekStartOf, todayStr } from '../src/utils/date.js'
 
 let failed = 0
 const check = (name, cond, detail = '') => {
@@ -115,6 +124,93 @@ check('换菜返回不同食谱', swapResult && swapResult.recipeId !== plan.mea
 // ---------- 6. computeNutrition 基准校验 ----------
 const chicken = computeNutrition([{ foodId: 'f_chicken_breast', grams: 150 }], FOODS_MAP)
 check('150g 鸡胸 ≈ 200kcal/33g 蛋白', chicken.kcal === 200 && Math.abs(chicken.protein - 33) < 0.5, `got ${chicken.kcal}/${chicken.protein}`)
+
+// ---------- 7. 日期工具 ----------
+check('addDays 跨月', addDays('2026-10-30', 3) === '2026-11-02')
+check('weekStartOf 周中', weekStartOf('2026-10-13') === '2026-10-12') // 2026-10-13 是周二
+check('weekStartOf 周日归上周', weekStartOf('2026-10-18') === '2026-10-12') // 周日
+check('weekStartOf 周一', weekStartOf('2026-10-12') === '2026-10-12')
+check('todayStr 格式', /^\d{4}-\d{2}-\d{2}$/.test(todayStr()))
+
+// ---------- 8. 周计划生成 ----------
+const weekPlan = generateWeekPlan({
+  recipes: RECIPES,
+  foods: FOODS_MAP,
+  targets,
+  excludedTags: [],
+  weekStart: '2026-10-12',
+})
+const weekNulls = []
+for (const [date, meals] of Object.entries(weekPlan)) {
+  for (const [meal, items] of Object.entries(meals)) {
+    items.forEach((it, i) => {
+      if (!it) weekNulls.push(`${date}/${meal}[${i}]`)
+    })
+  }
+}
+check('一周 7 天无空槽位', Object.keys(weekPlan).length === 7 && weekNulls.length === 0, weekNulls.join(', '))
+
+// 跨天多样性:同一食谱在周内出现的最大次数
+const weekUseCount = {}
+for (const meals of Object.values(weekPlan)) {
+  for (const items of Object.values(meals)) {
+    for (const it of items) {
+      if (it) weekUseCount[it.recipeId] = (weekUseCount[it.recipeId] || 0) + 1
+    }
+  }
+}
+const maxReuse = Math.max(...Object.values(weekUseCount))
+const distinctRecipes = Object.keys(weekUseCount).length
+console.log(`      一周共用 ${distinctRecipes} 种食谱,单食谱最大复用 ${maxReuse} 次(每周 63 个槽位,库共 ${RECIPES.length} 个)`)
+check('单食谱周内复用不超过 3 次', maxReuse <= 3, `max=${maxReuse}`)
+
+// 周内每天热量都在合理范围
+let worstDev = 0
+for (const [date, meals] of Object.entries(weekPlan)) {
+  const sm = summarizeDay({ date, meals }, FOODS_MAP, targets)
+  worstDev = Math.max(worstDev, Math.abs(sm.diff.kcal))
+}
+check('一周每天热量偏差均 ≤20%', worstDev <= 20, `worst=${Math.round(worstDev)}%`)
+
+// ---------- 9. 采购清单聚合 ----------
+const manualDays = {
+  '2026-10-12': weekPlan['2026-10-12'],
+  '2026-10-13': weekPlan['2026-10-13'],
+}
+const list = buildShoppingList(manualDays, FOODS_MAP)
+// 手动对照:逐食材累加克数,并统计真实出现天数
+const expect = new Map()
+const expectDays = new Map()
+for (const [date, meals] of Object.entries(manualDays)) {
+  const dayAgg = new Map()
+  for (const items of Object.values(meals)) {
+    for (const it of items) {
+      if (!it) continue
+      for (const ing of it.ingredients) {
+        dayAgg.set(ing.foodId, (dayAgg.get(ing.foodId) || 0) + ing.grams)
+      }
+    }
+  }
+  if (!expectDays.get('meta')) expectDays.set('meta', new Map())
+  for (const [id, g] of dayAgg) {
+    expect.set(id, (expect.get(id) || 0) + g)
+    const s = expectDays.get('meta').get(id) || new Set()
+    s.add(date)
+    expectDays.get('meta').set(id, s)
+  }
+}
+const daysMap = expectDays.get('meta')
+const listOk =
+  list.length === expect.size &&
+  list.every(
+    (f) => f.grams === Math.round(expect.get(f.foodId)) && f.days === daysMap.get(f.foodId).size
+  )
+check('采购清单克数聚合与出现天数正确', listOk,
+  `list=${list.length} expect=${expect.size}`)
+
+const fullList = buildShoppingList(weekPlan, FOODS_MAP)
+check('整周清单条目合理(10-60 种)', fullList.length >= 10 && fullList.length <= 60, `got ${fullList.length}`)
+check('清单含蛋白质类食材', fullList.some((f) => f.category === 'meat' || f.category === 'seafood'))
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

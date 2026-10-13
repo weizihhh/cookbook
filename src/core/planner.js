@@ -5,6 +5,8 @@
 // - 缩放顺序:蔬菜/水果固定份 → 蛋白槽按该餐蛋白目标(85%)倒推克数 → 主食槽按剩余热量倒推
 // - 缩放 = 对食谱基准配比乘系数 s(scalable 食材才乘,s 限制在 [0.3, 3] 防离谱)
 
+import { addDays } from '../utils/date.js'
+
 export const MEAL_TEMPLATES = {
   breakfast: ['staple', 'protein', 'fruit'],
   lunch: ['staple', 'protein', 'vegetable'],
@@ -201,9 +203,9 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   return slots.map((slot) => items[slot])
 }
 
-/** 生成全天计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } } */
-export function generateDayPlan({ recipes, foods, targets, excludedTags, date }) {
-  const usedIds = new Set() // 全天尽量不重复用同一食谱
+/** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } } */
+export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null }) {
+  const usedIds = sharedUsedIds ?? new Set() // 传入共享集合时跨天尽量不重复用同一食谱
   const meals = {}
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
     const target = targets.meals.find((m) => m.key === mealKey)
@@ -216,6 +218,73 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date })
     })
   }
   return { date, meals }
+}
+
+/**
+ * 生成一周计划(weekStart 起连续 7 天)。
+ * 跨天共享 usedIds:同一食谱优先不在一周内重复出现,池子耗尽才回退复用。
+ */
+export function generateWeekPlan({ recipes, foods, targets, excludedTags, weekStart, days = 7 }) {
+  const usedIds = new Set()
+  const result = {}
+  for (let i = 0; i < days; i++) {
+    const date = addDays(weekStart, i)
+    result[date] = generateDayPlan({
+      recipes,
+      foods,
+      targets,
+      excludedTags,
+      date,
+      sharedUsedIds: usedIds,
+    }).meals
+  }
+  return result
+}
+
+/**
+ * 采购清单:聚合若干天的全部食材用量
+ * @param days { 'YYYY-MM-DD': meals } 待聚合的天
+ * @returns [{ name, category, grams, days }] 按食材聚合,含出现天数(油盐等高频佐料与主料区分用)
+ */
+export function buildShoppingList(days, foods) {
+  const agg = new Map() // foodId -> { grams, days: Set<date> }
+  for (const [date, meals] of Object.entries(days)) {
+    if (!meals) continue
+    // 记录本天出现过的食材(同一天多餐用同一食材只计一次出现天数)
+    const today = new Map()
+    for (const items of Object.values(meals)) {
+      for (const item of items || []) {
+        if (!item) continue
+        for (const ing of item.ingredients) {
+          today.set(ing.foodId, (today.get(ing.foodId) || 0) + ing.grams)
+        }
+      }
+    }
+    for (const [foodId, grams] of today) {
+      const entry = agg.get(foodId) || { grams: 0, days: new Set() }
+      entry.grams += grams
+      entry.days.add(date)
+      agg.set(foodId, entry)
+    }
+  }
+  return [...agg.entries()]
+    .map(([foodId, { grams, days }]) => {
+      const f = foods[foodId] || {}
+      return {
+        foodId,
+        name: f.name || foodId,
+        category: f.category || 'other',
+        grams: Math.round(grams),
+        days: days.size,
+      }
+    })
+    .sort((a, b) => categoryOrder(a.category) - categoryOrder(b.category) || b.grams - a.grams)
+}
+
+const CATEGORY_ORDER = ['meat', 'seafood', 'egg_dairy_soy', 'grain', 'vegetable', 'fruit', 'oil_nuts']
+function categoryOrder(c) {
+  const i = CATEGORY_ORDER.indexOf(c)
+  return i === -1 ? 99 : i
 }
 
 /** 单槽位换菜:返回换好的 planItem(排除当前食谱,给一个不同的候选) */

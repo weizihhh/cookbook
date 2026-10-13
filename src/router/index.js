@@ -4,6 +4,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const routes = [
   { path: '/', redirect: '/today' },
   { path: '/today', component: () => import('../views/TodayView.vue') },
+  { path: '/week', component: () => import('../views/WeekView.vue') },
   { path: '/library', component: () => import('../views/LibraryView.vue') },
   { path: '/profile', component: () => import('../views/ProfileView.vue') },
 ]

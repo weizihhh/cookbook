@@ -51,9 +51,43 @@
         </div>
       </van-cell-group>
 
+      <!-- 体重快记 -->
+      <van-cell-group inset style="margin-bottom: 12px">
+        <template #title>
+          <div class="target-header">
+            <span>今日体重</span>
+            <span v-if="weight.latest" class="weight-change" :class="weight.totalChange <= 0 ? 'ok' : 'over'">
+              较首次 {{ weight.totalChange > 0 ? '+' : '' }}{{ weight.totalChange.toFixed(1) }}kg
+            </span>
+          </div>
+        </template>
+        <div class="weight-body">
+          <van-field
+            v-model="weightInput"
+            type="number"
+            placeholder="kg"
+            class="weight-input"
+            @keyup.enter="logWeight"
+          />
+          <van-button size="small" type="primary" @click="logWeight">记录</van-button>
+          <svg v-if="trendPoints.length >= 2" class="trend" :viewBox="`0 0 ${trendPoints.length * 20} 36`">
+            <polyline :points="trendPolyline" fill="none" stroke="#1989fa" stroke-width="2" />
+            <circle
+              v-for="(p, i) in trendPoints"
+              :key="i"
+              :cx="i * 20 + 4"
+              :cy="p.y"
+              r="2.5"
+              :fill="i === trendPoints.length - 1 ? '#1989fa' : '#c8c9cc'"
+            />
+          </svg>
+          <span v-else class="trend-empty">记录两周以上可看趋势</span>
+        </div>
+      </van-cell-group>
+
       <!-- 未生成 -->
       <van-empty
-        v-if="!plan.hasPlan"
+        v-if="!todayMeals"
         image="normal"
         description="还没有生成今日食谱"
       >
@@ -73,10 +107,18 @@
               <span>{{ meal.label }}</span>
               <span class="meal-target">
                 目标 {{ mealTargets[meal.key].kcal }} 千卡 · 蛋白 {{ mealTargets[meal.key].protein }}g
+                <van-tag
+                  v-if="checkin.statusOf(today, meal.key)"
+                  :type="checkin.statusOf(today, meal.key) === 'done' ? 'success' : 'default'"
+                  size="medium"
+                  style="margin-left: 4px"
+                >
+                  {{ checkin.statusOf(today, meal.key) === 'done' ? '已吃' : '跳过' }}
+                </van-tag>
               </span>
             </div>
           </template>
-          <template v-for="(item, i) in plan.meals[meal.key]" :key="i">
+          <template v-for="(item, i) in todayMeals[meal.key]" :key="i">
             <van-cell
               v-if="item"
               is-link
@@ -94,11 +136,17 @@
             </van-cell>
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
+          <van-cell
+            title="打卡"
+            is-link
+            :value="checkinText(meal.key)"
+            @click="openCheckin(meal.key)"
+          />
         </van-cell-group>
 
         <div style="display: flex; gap: 10px">
           <van-button block type="primary" plain @click="generate">重新生成</van-button>
-          <van-button block type="danger" plain @click="plan.clear()">清空</van-button>
+          <van-button block type="danger" plain @click="clearToday">清空</van-button>
         </div>
       </template>
     </template>
@@ -141,6 +189,15 @@
         </van-button>
       </div>
     </van-popup>
+
+    <!-- 打卡选择 -->
+    <van-action-sheet
+      v-model:show="checkinShow"
+      :actions="checkinActions"
+      cancel-text="取消"
+      close-on-click-action
+      @select="onCheckinSelect"
+    />
   </div>
 </template>
 
@@ -152,18 +209,26 @@ import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { FOODS_MAP } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
-import { usePlanStore } from '../stores/plan'
+import { useWeekStore } from '../stores/week'
+import { useCheckinStore } from '../stores/checkin'
+import { useWeightStore } from '../stores/weight'
+import { todayStr } from '../utils/date'
 
 const profile = useProfileStore()
-const plan = usePlanStore()
+const week = useWeekStore()
+const checkin = useCheckinStore()
+const weight = useWeightStore()
+const today = todayStr()
 
 const targets = computed(() => profile.targets)
 const modeLabel = computed(
   () => GOAL_MODES.find((m) => m.value === profile.mode)?.label || ''
 )
+const todayMeals = computed(() => week.mealsOf(today))
+const summary = computed(() => (todayMeals.value ? week.summaryOf(today) : null))
 
 const totals = computed(() =>
-  plan.summary ? plan.summary.totals : { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  summary.value ? summary.value.totals : { kcal: 0, protein: 0, carbs: 0, fat: 0 }
 )
 const kcalPercentage = computed(() =>
   targets.value.kcal > 0
@@ -171,14 +236,14 @@ const kcalPercentage = computed(() =>
     : 0
 )
 const deviationClass = computed(() => {
-  if (!plan.summary) return 'ok'
-  const d = plan.summary.diff.kcal
+  if (!summary.value) return 'ok'
+  const d = summary.value.diff.kcal
   if (Math.abs(d) <= 10) return 'ok'
   return d > 0 ? 'over' : 'under'
 })
 const deviationText = computed(() => {
-  if (!plan.summary) return '待生成'
-  const d = plan.summary.diff.kcal
+  if (!summary.value) return '待生成'
+  const d = summary.value.diff.kcal
   if (Math.abs(d) <= 10) return '达标 ✓'
   return d > 0 ? `热量超 ${d}%` : `热量低 ${-d}%`
 })
@@ -188,8 +253,58 @@ const mealTargets = computed(() =>
 )
 
 function generate() {
-  plan.generate()
+  week.generateDay(today)
   showToast('已生成')
+}
+function clearToday() {
+  week.clearDay(today)
+}
+
+// ---- 体重 ----
+const weightInput = ref(weight.kgOf(today) != null ? String(weight.kgOf(today)) : '')
+
+function logWeight() {
+  const kg = Number(weightInput.value)
+  if (!(kg > 0 && kg < 500)) {
+    showToast('请输入有效体重')
+    return
+  }
+  weight.log(today, kg)
+  showToast('已记录')
+}
+
+/** 最近 14 条记录的迷你趋势点(归一化到 36px 高) */
+const trendPoints = computed(() => {
+  const recent = weight.records.slice(-14)
+  if (recent.length < 2) return []
+  const kgs = recent.map((r) => r.kg)
+  const min = Math.min(...kgs)
+  const max = Math.max(...kgs)
+  const span = Math.max(max - min, 0.1) // 防止全部相同除零
+  return recent.map((r) => ({ y: 30 - ((r.kg - min) / span) * 24 + 3 }))
+})
+const trendPolyline = computed(() =>
+  trendPoints.value.map((p, i) => `${i * 20 + 4},${p.y}`).join(' ')
+)
+
+// ---- 打卡 ----
+const checkinShow = ref(false)
+const checkinMeal = ref('')
+const checkinActions = [
+  { name: '已按计划吃', value: 'done' },
+  { name: '这餐跳过了', value: 'skip' },
+  { name: '清除打卡', value: null },
+]
+function checkinText(mealKey) {
+  const s = checkin.statusOf(today, mealKey)
+  return s === 'done' ? '已吃 ✓' : s === 'skip' ? '跳过' : '未打卡'
+}
+function openCheckin(mealKey) {
+  checkinMeal.value = mealKey
+  checkinShow.value = true
+}
+function onCheckinSelect(action) {
+  checkin.mark(today, checkinMeal.value, action.value)
 }
 
 // ---- 详情弹层 ----
@@ -197,8 +312,8 @@ const detailShow = ref(false)
 const detailMealKey = ref(null)
 const detailIndex = ref(-1)
 const detailItem = computed(() =>
-  detailShow.value && plan.meals && detailMealKey.value != null
-    ? plan.meals[detailMealKey.value][detailIndex.value]
+  detailShow.value && todayMeals.value && detailMealKey.value != null
+    ? todayMeals.value[detailMealKey.value][detailIndex.value]
     : null
 )
 const detailRecipe = computed(() =>
@@ -215,7 +330,7 @@ function openDetail(mealKey, index) {
 }
 
 function doSwap() {
-  const ok = plan.swap(detailMealKey.value, detailItem.value.slot)
+  const ok = week.swap(today, detailMealKey.value, detailItem.value.slot)
   if (!ok) {
     showToast('没有其他可用的候选了')
     return
@@ -266,8 +381,40 @@ function ingredientText(item) {
 .deviation.under {
   color: #ff976a;
 }
+.weight-change {
+  font-size: 12px;
+  font-weight: normal;
+}
+.weight-change.ok {
+  color: #07c160;
+}
+.weight-change.over {
+  color: #ff976a;
+}
 .target-body {
   padding: 8px 16px 14px;
+}
+.weight-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 12px;
+}
+.weight-input {
+  flex: 0 0 110px;
+  padding: 6px 10px;
+  background: #f7f8fa;
+  border-radius: 6px;
+}
+.trend {
+  flex: 1;
+  height: 36px;
+  min-width: 0;
+}
+.trend-empty {
+  flex: 1;
+  font-size: 11px;
+  color: #c8c9cc;
 }
 .detail {
   padding: 16px;
