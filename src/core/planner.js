@@ -110,11 +110,14 @@ export function filterCandidates(recipes, { slot, meal, excludedTags = [] }) {
   )
 }
 
-function pickFrom(candidates, usedIds) {
+function pickFrom(candidates, usedIds, recentIds = []) {
   const fresh = candidates.filter((r) => !usedIds.has(r.id))
   const pool = fresh.length ? fresh : candidates
-  if (!pool.length) return null
-  return pool[Math.floor(Math.random() * pool.length)]
+  // 有"最近吃过"偏好时优先从中选:吃得单一的人,生成的就是熟悉的菜
+  const recent = pool.filter((r) => recentIds.includes(r.id))
+  const finalPool = recent.length ? recent : pool
+  if (!finalPool.length) return null
+  return finalPool[Math.floor(Math.random() * finalPool.length)]
 }
 
 /** 已选槽位的热量合计 */
@@ -128,7 +131,7 @@ function usedKcal(items, foods) {
  * 按"缩放范围内可交付量"挑候选:能交付 ≥90% 目标的优先入池再随机,
  * 都不够时从交付量最高的前5个随机,兼顾达标与多样性
  */
-function pickScored(candidates, usedIds, foods, metric, want) {
+function pickScored(candidates, usedIds, foods, metric, want, recentIds = []) {
   if (!candidates.length) return null
   const scored = candidates.map((r) => {
     const base = scalableBase(r, foods)
@@ -138,6 +141,12 @@ function pickScored(candidates, usedIds, foods, metric, want) {
   })
   let pool = scored.filter((c) => !usedIds.has(c.r.id))
   if (!pool.length) pool = scored
+  // 最近吃过优先于营养最优:生成只是参考起点,吃固定的菜的人要的是熟悉的组合
+  const recent = pool.filter((c) => recentIds.includes(c.r.id))
+  if (recent.length) {
+    const top = [...recent].sort((a, b) => b.deliverable - a.deliverable).slice(0, 3)
+    return top[Math.floor(Math.random() * top.length)].r
+  }
   const qualified = pool.filter((c) => c.deliverable >= want * 0.9)
   const finalPool = qualified.length
     ? qualified
@@ -146,7 +155,7 @@ function pickScored(candidates, usedIds, foods, metric, want) {
 }
 
 /** 组装一餐。返回 planItems 数组;某槽位无候选时该项为 null(由调用方提示) */
-export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, usedIds }) {
+export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, usedIds, recentIds = [] }) {
   const slots = MEAL_TEMPLATES[mealKey]
   const items = {}
 
@@ -154,7 +163,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   for (const slot of ['vegetable', 'fruit']) {
     if (!slots.includes(slot)) continue
     const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
-    const recipe = pickFrom(cand, usedIds)
+    const recipe = pickFrom(cand, usedIds, recentIds)
     if (!recipe) {
       items[slot] = null
       continue
@@ -183,13 +192,21 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   )
   let proteinPool = scoredCand.filter((c) => !usedIds.has(c.r.id))
   if (!proteinPool.length) proteinPool = scoredCand
-  const proteinQualified = proteinPool.filter((c) => c.deliverable >= proteinWant * 0.9)
-  const proteinFinal = proteinQualified.length
-    ? proteinQualified
-    : [...proteinPool].sort((a, b) => b.deliverable - a.deliverable).slice(0, 5)
-  const proteinPick = proteinFinal.length
-    ? proteinFinal[Math.floor(Math.random() * proteinFinal.length)]
-    : null
+  // 最近吃过优先于营养最优(与 pickScored 同规则):先从熟悉的蛋白候选中选
+  const proteinRecent = proteinPool.filter((c) => recentIds.includes(c.r.id))
+  let proteinPick = null
+  if (proteinRecent.length) {
+    const top = [...proteinRecent].sort((a, b) => b.deliverable - a.deliverable).slice(0, 3)
+    proteinPick = top[Math.floor(Math.random() * top.length)]
+  } else {
+    const proteinQualified = proteinPool.filter((c) => c.deliverable >= proteinWant * 0.9)
+    const proteinFinal = proteinQualified.length
+      ? proteinQualified
+      : [...proteinPool].sort((a, b) => b.deliverable - a.deliverable).slice(0, 5)
+    proteinPick = proteinFinal.length
+      ? proteinFinal[Math.floor(Math.random() * proteinFinal.length)]
+      : null
+  }
   if (proteinPick) {
     usedIds.add(proteinPick.r.id)
     items.protein = scaleRecipe(proteinPick.r, foods, {
@@ -203,7 +220,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   // 3) 主食:按剩余热量倒推;优先选"缩放范围内能足量供热量"的候选
   //    (南瓜/山药等低热量密度主食在高热量目标下天然吃亏,自动退居备选)
   const stapleCand = filterCandidates(recipes, { slot: 'staple', meal: mealKey, excludedTags })
-  const stapleRecipe = pickScored(stapleCand, usedIds, foods, 'kcal', Math.max(80, target.kcal - usedKcal(items, foods)))
+  const stapleRecipe = pickScored(stapleCand, usedIds, foods, 'kcal', Math.max(80, target.kcal - usedKcal(items, foods)), recentIds)
   if (stapleRecipe) {
     usedIds.add(stapleRecipe.id)
     const remaining = Math.max(80, target.kcal - usedKcal(items, foods))
@@ -216,7 +233,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
 }
 
 /** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } } */
-export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null }) {
+export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null, recentIds = [] }) {
   const usedIds = sharedUsedIds ?? new Set() // 传入共享集合时跨天尽量不重复用同一食谱
   const meals = {}
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
@@ -227,6 +244,7 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date, s
       target,
       excludedTags,
       usedIds,
+      recentIds,
     })
   }
   return { date, meals }

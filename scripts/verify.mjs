@@ -91,6 +91,29 @@ console.log(`      全天合计: ${s.totals.kcal} kcal (目标 ${targets.kcal}, 
 check('热量偏差在 ±15% 内', Math.abs(s.diff.kcal) <= 15)
 check('蛋白偏差在 -10%~+40% 内(蛋白槽合格池允许90%交付,营养学无害)', s.diff.protein >= -10 && s.diff.protein <= 40)
 
+// 生成偏好:传 recentIds 时三餐全部选自该池(池内每餐每槽位有足量候选)
+{
+  const pool = []
+  for (const meal of ['breakfast', 'lunch', 'dinner']) {
+    for (const slot of ['staple', 'protein', 'vegetable', 'fruit']) {
+      pool.push(
+        ...RECIPES.filter((r) => r.slot === slot && r.mealFit.includes(meal))
+          .slice(0, 4)
+          .map((r) => r.id)
+      )
+    }
+  }
+  const ids = new Set(pool)
+  let allFromPool = true
+  for (let i = 0; i < 5; i++) {
+    const pl = generateDayPlan({ recipes: RECIPES, foods: FOODS_MAP, targets, excludedTags: [], date: 'test-recent', recentIds: pool })
+    for (const it of Object.values(pl.meals).flat()) {
+      if (it && !ids.has(it.recipeId)) allFromPool = false
+    }
+  }
+  check('生成偏好:三餐全部来自最近吃过池', allFromPool)
+}
+
 // 多组画像收敛性:不同目标下偏差都可接受
 const profiles = [
   { gender: 'female', age: 26, height: 162, weight: 52, activity: 1.2, mode: 'cut' },

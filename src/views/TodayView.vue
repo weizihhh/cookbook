@@ -632,28 +632,8 @@ function openAdd(mealKey) {
   addShow.value = true
 }
 
-// 最近吃过:今天及以前各天用过的菜品,按天倒序去重取前 8(被打卡"跳过"的餐不算)
-const recentRecipeIds = computed(() => {
-  const seen = new Set()
-  const out = []
-  const dates = Object.keys(week.days)
-    .filter((d) => d <= today)
-    .sort()
-    .reverse()
-  for (const d of dates) {
-    const meals = week.days[d]
-    if (!meals) continue
-    for (const m of MEALS) {
-      if (checkin.statusOf(d, m.key) === 'skip') continue
-      for (const it of meals[m.key] || []) {
-        if (!it || seen.has(it.recipeId)) continue
-        seen.add(it.recipeId)
-        out.push(it.recipeId)
-      }
-    }
-  }
-  return out.slice(0, 8)
-})
+// 最近吃过:与生成偏好共用 store 逻辑(按天倒序去重、skip 餐不计),取前 8
+const recentRecipeIds = computed(() => week.recentRecipeIds(today).slice(0, 8))
 
 function quickAdd(id) {
   const r = RECIPES_MAP[id]

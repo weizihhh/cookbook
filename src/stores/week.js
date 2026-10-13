@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, generateWeekPlan, swapSlotItem, addItemToMeal, summarizeDay } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, summarizeDay } from '../core/planner'
 import { useProfileStore } from './profile'
+import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
-import { todayStr, weekStartOf, addDays } from '../utils/date'
+import { todayStr, weekStartOf } from '../utils/date'
 
 const KEY = 'week'
 
@@ -23,11 +24,7 @@ function initState() {
 export const useWeekStore = defineStore('week', {
   state: () => initState(),
 
-  getters: {
-    /** 本周日期数组(周一到周日) */
-    weekDates: (s) => Array.from({ length: 7 }, (_, i) => addDays(s.weekStart, i)),
-    hasAny: (s) => Object.values(s.days).some((m) => m),
-  },
+  getters: {},
 
   actions: {
     persist() {
@@ -44,7 +41,7 @@ export const useWeekStore = defineStore('week', {
     hasDay(date) {
       return !!this.days[date]
     },
-    /** 生成单日(今日页"生成今日三餐"用) */
+    /** 生成单日(今日页"生成今日三餐"用);有历史记录时优先从最近吃过的菜中组装 */
     generateDay(date) {
       const profile = useProfileStore()
       this.syncWeekOf(date)
@@ -54,21 +51,32 @@ export const useWeekStore = defineStore('week', {
         targets: profile.targets,
         excludedTags: profile.excludedTags,
         date,
+        recentIds: this.recentRecipeIds(date),
       }).meals
       this.persist()
     },
-    /** 生成整周(覆盖本周已有天) */
-    generateWeek() {
-      const profile = useProfileStore()
-      const week = generateWeekPlan({
-        recipes: RECIPES,
-        foods: FOODS_MAP,
-        targets: profile.targets,
-        excludedTags: profile.excludedTags,
-        weekStart: this.weekStart,
-      })
-      this.days = { ...this.days, ...week }
-      this.persist()
+    /** 最近吃过的食谱 id:按天倒序、跨天去重;打卡"跳过"的餐不计(没吃过) */
+    recentRecipeIds(beforeDate = null) {
+      const checkin = useCheckinStore()
+      const seen = new Set()
+      const out = []
+      const dates = Object.keys(this.days)
+        .filter((d) => !beforeDate || d <= beforeDate)
+        .sort()
+        .reverse()
+      for (const d of dates) {
+        const meals = this.days[d]
+        if (!meals) continue
+        for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+          if (checkin.statusOf(d, mealKey) === 'skip') continue
+          for (const it of meals[mealKey] || []) {
+            if (!it || seen.has(it.recipeId)) continue
+            seen.add(it.recipeId)
+            out.push(it.recipeId)
+          }
+        }
+      }
+      return out
     },
     /** 换掉某天某餐某槽位的菜,无可用候选时返回 false */
     swap(date, mealKey, slot) {
