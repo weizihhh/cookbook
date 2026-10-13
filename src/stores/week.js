@@ -106,12 +106,13 @@ export const useWeekStore = defineStore('week', {
     addItem(date, mealKey, recipeId) {
       return this.addItemCustom(date, mealKey, recipeId, null)
     },
-    /** 添加菜品并指定各食材克数 */
+    /** 添加菜品并指定各食材克数;当天无数据时创建空天(免生成直接记录) */
     addItemCustom(date, mealKey, recipeId, ingredients) {
-      const meals = this.days[date]
       const recipe = RECIPES_MAP[recipeId]
-      if (!meals || !recipe) return null
-      const result = addItemToMeal(meals, mealKey, recipe, ingredients)
+      if (!recipe) return null
+      this.syncWeekOf(date)
+      if (!this.days[date]) this.days[date] = { breakfast: [], lunch: [], dinner: [] }
+      const result = addItemToMeal(this.days[date], mealKey, recipe, ingredients)
       if (result) this.persist()
       return result
     },

@@ -96,23 +96,13 @@
         </div>
       </van-cell-group>
 
-      <!-- 未生成 -->
-      <van-empty
-        v-if="!todayMeals"
-        image="normal"
-        description="还没有生成今日食谱"
+      <!-- 三餐列表:免生成,未生成也可直接添加菜品记录实际进食 -->
+      <van-cell-group
+        v-for="meal in MEALS"
+        :key="meal.key"
+        inset
+        style="margin-bottom: 12px"
       >
-        <van-button round type="primary" @click="generate">生成今日三餐</van-button>
-      </van-empty>
-
-      <!-- 三餐列表 -->
-      <template v-else>
-        <van-cell-group
-          v-for="meal in MEALS"
-          :key="meal.key"
-          inset
-          style="margin-bottom: 12px"
-        >
           <template #title>
             <div class="meal-header">
               <span>{{ meal.label }}</span>
@@ -130,7 +120,7 @@
               </span>
             </div>
           </template>
-          <template v-for="(item, i) in todayMeals[meal.key]" :key="i">
+          <template v-for="(item, i) in mealItems(meal.key)" :key="i">
             <van-cell
               v-if="item"
               is-link
@@ -145,6 +135,7 @@
               </template>            </van-cell>
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
+          <van-cell v-if="!mealItems(meal.key).length" title="未记录" label="点下方 + 添加菜品,记录实际吃的" />
           <div class="meal-actions">
             <van-button size="small" round plain type="primary" @click="openAdd(meal.key)">
               + 添加菜品
@@ -156,10 +147,12 @@
         </van-cell-group>
 
         <div style="display: flex; gap: 10px">
-          <van-button block round type="primary" plain @click="generate">重新生成</van-button>
-          <van-button block round type="danger" plain @click="clearToday">清空</van-button>
+          <template v-if="todayMeals">
+            <van-button block round type="primary" plain @click="generate">重新生成</van-button>
+            <van-button block round type="danger" plain @click="clearToday">清空</van-button>
+          </template>
+          <van-button v-else block round type="primary" @click="generate">生成今日三餐</van-button>
         </div>
-      </template>
 
       <!-- 每日贴士:置于页尾,轻度呈现 -->
       <div class="tips-card">
@@ -246,6 +239,22 @@
     <van-popup v-model:show="addShow" position="bottom" round :style="{ height: '72%' }">
       <div class="add-panel">
         <van-search v-model="addSearch" placeholder="搜索食谱,如:鸡胸、豆腐" />
+        <div v-if="recentRecipeIds.length" class="recent-row">
+          <span class="recent-label">最近</span>
+          <div class="recent-chips">
+            <van-tag
+              v-for="id in recentRecipeIds"
+              :key="id"
+              plain
+              type="primary"
+              size="large"
+              class="recent-chip"
+              @click="quickAdd(id)"
+            >
+              {{ recipeName(id) }}
+            </van-tag>
+          </div>
+        </div>
         <van-tabs v-model:active="addTab" shrink>
           <van-tab v-for="s in addSlots" :key="s.value" :title="s.label">
             <div class="add-list">
@@ -381,15 +390,19 @@ const kcalPercentage = computed(() =>
     : 0
 )
 const allSkipped = computed(() => MEALS.every((m) => mealActuals.value[m.key]?.skipped))
+// 当天是否记录过任何条目(空天/未记录时状态文案用"未记录",不算偏差)
+const hasAnyItem = computed(() =>
+  MEALS.some((m) => (todayMeals.value?.[m.key] || []).some(Boolean))
+)
 const deviationClass = computed(() => {
-  if (!summary.value) return 'none'
+  if (!summary.value || !hasAnyItem.value) return 'none'
   if (allSkipped.value) return 'none'
   const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return 'ok'
   return d > 0 ? 'over' : 'under'
 })
 const deviationText = computed(() => {
-  if (!summary.value) return '待生成'
+  if (!hasAnyItem.value) return '未记录'
   if (allSkipped.value) return '今日未进食'
   const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return '达标 ✓'
@@ -457,7 +470,7 @@ const macroRows = computed(() =>
     const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0
     let statusClass = 'none'
     let statusText = '—'
-    if (summary.value && !allSkipped.value && target > 0) {
+    if (summary.value && hasAnyItem.value && !allSkipped.value && target > 0) {
       const d = Math.round(((actual - target) / target) * 100)
       if (Math.abs(d) <= 10) {
         statusClass = 'ok'
@@ -486,7 +499,7 @@ const ringDash = computed(
   () => `${(kcalPercentage.value / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`
 )
 const remainingText = computed(() => {
-  if (!summary.value) return '生成食谱后开始记录'
+  if (!hasAnyItem.value) return '记录菜品后开始统计'
   if (allSkipped.value) return '今日未进食'
   const r = Math.round(targets.value.kcal - totals.value.kcal)
   return r >= 0 ? `还可摄入 ${r} 千卡` : `已超 ${-r} 千卡`
@@ -498,6 +511,9 @@ function generate() {
 }
 function clearToday() {
   week.clearDay(today)
+}
+function mealItems(mealKey) {
+  return todayMeals.value?.[mealKey] || []
 }
 
 // ---- 体重 ----
@@ -614,6 +630,34 @@ function openAdd(mealKey) {
   addMealKey.value = mealKey
   addSearch.value = ''
   addShow.value = true
+}
+
+// 最近吃过:今天及以前各天用过的菜品,按天倒序去重取前 8(被打卡"跳过"的餐不算)
+const recentRecipeIds = computed(() => {
+  const seen = new Set()
+  const out = []
+  const dates = Object.keys(week.days)
+    .filter((d) => d <= today)
+    .sort()
+    .reverse()
+  for (const d of dates) {
+    const meals = week.days[d]
+    if (!meals) continue
+    for (const m of MEALS) {
+      if (checkin.statusOf(d, m.key) === 'skip') continue
+      for (const it of meals[m.key] || []) {
+        if (!it || seen.has(it.recipeId)) continue
+        seen.add(it.recipeId)
+        out.push(it.recipeId)
+      }
+    }
+  }
+  return out.slice(0, 8)
+})
+
+function quickAdd(id) {
+  const r = RECIPES_MAP[id]
+  if (r) doAdd(r)
 }
 
 // 搜索会放开到全库,对不属于当前餐次的候选加"非早/午/晚餐"标记
@@ -912,9 +956,29 @@ function ingredientText(item) {
   overflow: hidden;
 }
 .add-list {
-  max-height: calc(72vh - 140px);
+  max-height: calc(72vh - 180px);
   overflow-y: auto;
   padding-bottom: 20px;
+}
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+.recent-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #969799;
+}
+.recent-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.recent-chip {
+  flex: 0 0 auto;
+  cursor: pointer;
 }
 .add-kcal {
   font-size: 12px;
