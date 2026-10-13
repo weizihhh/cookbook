@@ -12,21 +12,7 @@
     </van-empty>
 
     <template v-else>
-      <!-- 每日贴士 -->
-      <van-cell-group inset style="margin-bottom: 12px">
-        <template #title>
-          <div class="target-header">
-            <span>💡 每日一读</span>
-            <span class="tips-more" @click="$router.push('/profile')">全部贴士 →</span>
-          </div>
-        </template>
-        <div class="tips-body">
-          <div class="tips-title">{{ dailyTip.title }}</div>
-          <div class="tips-text">{{ dailyTip.body }}</div>
-        </div>
-      </van-cell-group>
-
-      <!-- 目标概览:热量 + 三大营养素逐行,每行进度条 + 达标状态 -->
+      <!-- 目标概览:热量环主视觉 + 三大营养素逐行达标 -->
       <van-cell-group inset style="margin-bottom: 12px">
         <template #title>
           <div class="target-header">
@@ -34,19 +20,30 @@
           </div>
         </template>
         <div class="target-body">
-          <div class="metric-row">
-            <div class="metric-head">
-              <span class="metric-name">热量</span>
-              <span class="metric-val"><b>{{ totals.kcal }}</b> / {{ targets.kcal }} 千卡</span>
-              <span class="metric-status" :class="deviationClass">{{ deviationText }}</span>
+          <div class="kcal-hero">
+            <div class="kcal-ring">
+              <svg viewBox="0 0 120 120">
+                <circle class="ring-track" cx="60" cy="60" r="52" />
+                <circle
+                  class="ring-bar"
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  :stroke="ringColor"
+                  :stroke-dasharray="ringDash"
+                />
+              </svg>
+              <div class="kcal-center">
+                <div class="kcal-num">{{ totals.kcal }}</div>
+                <div class="kcal-target">目标 {{ targets.kcal }} 千卡</div>
+              </div>
             </div>
-            <van-progress
-              :percentage="kcalPercentage"
-              :show-pivot="false"
-              color="#1989fa"
-              track-color="#ebedf0"
-            />
+            <div class="kcal-caption">
+              <span class="kcal-chip" :class="deviationClass">{{ deviationText }}</span>
+              <span class="kcal-remaining">{{ remainingText }}</span>
+            </div>
           </div>
+          <div class="macro-divider"></div>
           <div v-for="m in macroRows" :key="m.key" class="metric-row">
             <div class="metric-head">
               <span class="metric-name">{{ m.label }}</span>
@@ -57,7 +54,7 @@
               :percentage="m.pct"
               :show-pivot="false"
               :color="m.color"
-              track-color="#ebedf0"
+              track-color="#eef2f0"
             />
           </div>
           <div v-if="hasSkippedMeal" class="skip-note">已跳过的餐次不计入上方合计</div>
@@ -139,9 +136,7 @@
               @click="openDetail(meal.key, i)"
             >
               <template #title>
-                <van-tag plain type="primary" size="medium" style="margin-right: 6px">
-                  {{ SLOT_LABELS[item.slot] }}
-                </van-tag>
+                <span class="slot-chip">{{ SLOT_LABELS[item.slot] }}</span>
                 {{ recipeName(item.recipeId) }}
               </template>
               <template #label>
@@ -149,18 +144,14 @@
               </template>            </van-cell>
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
-          <van-cell
-            title="+ 添加菜品"
-            is-link
-            center
-            @click="openAdd(meal.key)"
-          />
-          <van-cell
-            title="打卡"
-            is-link
-            :value="checkinText(meal.key)"
-            @click="openCheckin(meal.key)"
-          />
+          <div class="meal-actions">
+            <van-button size="small" plain type="primary" @click="openAdd(meal.key)">
+              + 添加菜品
+            </van-button>
+            <van-button size="small" plain type="primary" @click="openCheckin(meal.key)">
+              打卡 · {{ checkinText(meal.key) }}
+            </van-button>
+          </div>
         </van-cell-group>
 
         <div style="display: flex; gap: 10px">
@@ -168,6 +159,16 @@
           <van-button block type="danger" plain @click="clearToday">清空</van-button>
         </div>
       </template>
+
+      <!-- 每日贴士:置于页尾,轻度呈现 -->
+      <div class="tips-card">
+        <div class="tips-head">
+          <span>💡 每日一读</span>
+          <span class="tips-more" @click="$router.push('/profile')">全部贴士 →</span>
+        </div>
+        <div class="tips-title">{{ dailyTip.title }}</div>
+        <div class="tips-text">{{ dailyTip.body }}</div>
+      </div>
     </template>
 
     <!-- 食谱详情弹层 -->
@@ -180,7 +181,7 @@
       <div v-if="detailItem" class="detail">
         <div class="detail-title">
           {{ recipeName(detailItem.recipeId) }}
-          <van-tag v-if="detailRecipe?.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+          <van-tag v-if="detailRecipe?.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
         </div>
         <div class="nutri-grid" style="margin-bottom: 12px">
           <div><div class="num">{{ detailNutrition.kcal }}</div><div class="label">千卡</div></div>
@@ -255,7 +256,7 @@
               >
                 <template #title>
                   {{ r.name }}
-                  <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
+                  <van-tag v-if="r.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 4px">抗炎</van-tag>
                   <van-tag v-if="r.custom" plain type="primary" size="medium" style="margin-left: 4px">
                     {{ r.source || '自定义' }}
                   </van-tag>
@@ -279,7 +280,7 @@
       <div v-if="addDraft" class="detail">
         <div class="detail-title">
           添加:{{ RECIPES_MAP[addDraft.recipeId]?.name }}
-          <van-tag v-if="RECIPES_MAP[addDraft.recipeId]?.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+          <van-tag v-if="RECIPES_MAP[addDraft.recipeId]?.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
         </div>
         <van-cell title="用量调整" />
         <van-cell v-for="ing in addDraft.ingredients" :key="ing.foodId">
@@ -444,8 +445,8 @@ const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]
 
 // 三大营养素逐行展示:实际/目标 + 进度条 + 达标状态;±10% 内视为达标(与热量口径一致)
 const MACRO_META = [
-  { key: 'protein', label: '蛋白质', color: '#1989fa' },
-  { key: 'carbs', label: '碳水', color: '#07c160' },
+  { key: 'protein', label: '蛋白质', color: '#00b578' },
+  { key: 'carbs', label: '碳水', color: '#1989fa' },
   { key: 'fat', label: '脂肪', color: '#ff976a' },
 ]
 const macroRows = computed(() =>
@@ -471,6 +472,24 @@ const macroRows = computed(() =>
     return { ...meta, actual, target, pct, statusClass, statusText }
   })
 )
+
+// 热量环:SVG 圆环,颜色随达标状态变化(stroke 属性不支持 var(),用色值)
+const RING_CIRCUMFERENCE = 2 * Math.PI * 52
+const ringColor = computed(
+  () =>
+    ({ ok: '#00b578', over: '#ee0a24', under: '#ff976a', none: '#dce1de' })[
+      deviationClass.value
+    ] || '#00b578'
+)
+const ringDash = computed(
+  () => `${(kcalPercentage.value / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`
+)
+const remainingText = computed(() => {
+  if (!summary.value) return '生成食谱后开始记录'
+  if (allSkipped.value) return '今日未进食'
+  const r = Math.round(targets.value.kcal - totals.value.kcal)
+  return r >= 0 ? `还可摄入 ${r} 千卡` : `已超 ${-r} 千卡`
+})
 
 function generate() {
   week.generateDay(today)
@@ -734,6 +753,108 @@ function ingredientText(item) {
 .target-body {
   padding: 8px 16px 14px;
 }
+/* 热量环主视觉 */
+.kcal-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0 2px;
+}
+.kcal-ring {
+  position: relative;
+  width: 132px;
+  height: 132px;
+}
+.kcal-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ring-track {
+  fill: none;
+  stroke: #edf1ef;
+  stroke-width: 10;
+}
+.ring-bar {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.3s;
+}
+.kcal-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.kcal-num {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--cb-text, #1f2d27);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.kcal-target {
+  font-size: 11px;
+  color: #969799;
+  margin-top: 2px;
+}
+.kcal-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.kcal-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.kcal-chip.none {
+  background: #f1f3f2;
+  color: #969799;
+}
+.kcal-chip.ok {
+  background: var(--cb-primary-light);
+  color: var(--cb-primary);
+}
+.kcal-chip.over {
+  background: #ffeceb;
+  color: #ee0a24;
+}
+.kcal-chip.under {
+  background: #fff3eb;
+  color: #ff976a;
+}
+.kcal-remaining {
+  font-size: 12px;
+  color: #697771;
+}
+.macro-divider {
+  height: 1px;
+  background: #eef2f0;
+  margin: 12px 0;
+}
+.slot-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: var(--cb-primary-light);
+  color: var(--cb-primary);
+  font-size: 10px;
+  vertical-align: 1px;
+}
+.meal-actions {
+  display: flex;
+  gap: 10px;
+  padding: 8px 16px 12px;
+}
+.meal-actions .van-button {
+  flex: 1;
+}
 .weight-body {
   display: flex;
   align-items: center;
@@ -756,18 +877,27 @@ function ingredientText(item) {
   font-size: 11px;
   color: #c8c9cc;
 }
+.tips-card {
+  background: linear-gradient(135deg, #e9f8f1, #f2fbf7);
+  border-radius: var(--cb-card-radius);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(31, 45, 39, 0.05);
+}
+.tips-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .tips-more {
   font-size: 12px;
-  color: #1989fa;
+  color: var(--cb-primary);
   font-weight: normal;
-}
-.tips-body {
-  padding: 8px 16px 12px;
 }
 .tips-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 8px 0 4px;
 }
 .tips-text {
   font-size: 13px;

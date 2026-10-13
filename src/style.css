@@ -1,3 +1,17 @@
+:root {
+  /* 薄荷清爽主题 token(全局换肤只需改这里) */
+  --cb-primary: #00b578;
+  --cb-primary-light: #e8f8f1;
+  --cb-text: #1f2d27;
+  --cb-bg: #f5f7f6;
+  --cb-card-radius: 14px;
+
+  /* Vant 主题变量:按钮/标签/进度/底部导航等全局跟随主色 */
+  --van-primary-color: var(--cb-primary);
+  --van-success-color: var(--cb-primary);
+  --van-cell-group-inset-border-radius: var(--cb-card-radius);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -6,7 +20,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #f7f8fa;
+  background: var(--cb-bg);
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
     Segoe UI, Arial, Roboto, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft Yahei', sans-serif;
@@ -18,11 +32,16 @@ body {
   max-width: 560px;
   margin: 0 auto;
   min-height: 100vh;
-  background: #f7f8fa;
+  background: var(--cb-bg);
 }
 
 .page {
   padding: 12px 12px calc(66px + env(safe-area-inset-bottom));
+}
+
+/* 卡片轻投影,配合圆角营造清爽卡片感 */
+.van-cell-group--inset {
+  box-shadow: 0 1px 4px rgba(31, 45, 39, 0.05);
 }
 
 .nutri-grid {
