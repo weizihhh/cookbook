@@ -99,6 +99,54 @@ export const RECIPES = [
     ingredients: [{ foodId: 'f_pumpkin', grams: 250, scalable: true }],
     steps: ['南瓜切块,水开后蒸15分钟'],
   },
+  {
+    id: 'r_black_glutinous_rice', name: '紫米饭', slot: 'staple', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_black_glutinous_rice', grams: 40, scalable: true },
+      { foodId: 'f_rice', grams: 30, scalable: true },
+    ],
+    steps: ['紫米提前浸泡3小时', '与大米混合,1:1.2 加水煮熟'],
+  },
+  {
+    id: 'r_mung_bean_porridge', name: '绿豆粥', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_mung_bean_dry', grams: 30, scalable: true },
+      { foodId: 'f_rice', grams: 20, scalable: true },
+    ],
+    steps: ['绿豆提前浸泡2小时', '与大米加水煮至开花'],
+  },
+  {
+    id: 'r_red_bean_rice', name: '红豆饭', slot: 'staple', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_red_bean_dry', grams: 25, scalable: true },
+      { foodId: 'f_rice', grams: 40, scalable: true },
+    ],
+    steps: ['红豆提前浸泡4小时煮半小时', '加入大米同煮熟'],
+  },
+  {
+    id: 'r_oat_banana_bowl', name: '燕麦香蕉碗', slot: 'staple', mealFit: ['breakfast'], tags: ['gluten'],
+    ingredients: [
+      { foodId: 'f_oats', grams: 40, scalable: true },
+      { foodId: 'f_banana', grams: 100, scalable: false },
+    ],
+    steps: ['燕麦加热水或牛奶泡5分钟', '香蕉切片铺上'],
+  },
+  {
+    id: 'r_sweet_potato_porridge', name: '红薯粥', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_sweet_potato', grams: 150, scalable: true },
+      { foodId: 'f_rice', grams: 25, scalable: true },
+    ],
+    steps: ['红薯去皮切块', '与大米加水煮25分钟'],
+  },
+  {
+    id: 'r_pumpkin_millet_porridge', name: '南瓜小米粥', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_pumpkin', grams: 120, scalable: true },
+      { foodId: 'f_millet', grams: 40, scalable: true },
+    ],
+    steps: ['南瓜切块与小米同煮', '大火烧开转小火20分钟'],
+  },
 
   // ================= 蛋白 —— 早餐组 =================
   {
@@ -143,6 +191,21 @@ export const RECIPES = [
     id: 'r_tofu_pudding', name: '豆腐脑', slot: 'protein', mealFit: ['breakfast'], tags: ['soy'],
     ingredients: [{ foodId: 'f_tofu_soft', grams: 300, scalable: true }],
     steps: ['内酯豆腐蒸5分钟', '浇少量生抽、香油、葱花(咸口)'],
+  },
+  {
+    id: 'r_quail_eggs', name: '鹌鹑蛋一盒', slot: 'protein', mealFit: ['breakfast'], tags: ['egg'],
+    ingredients: [{ foodId: 'f_quail_egg', grams: 100, scalable: true }],
+    steps: ['冷水下锅煮5分钟,约10个'],
+  },
+  {
+    id: 'r_black_bean_milk', name: '黑豆浆', slot: 'protein', mealFit: ['breakfast'], tags: ['soy'],
+    ingredients: [{ foodId: 'f_black_bean_dry', grams: 40, scalable: true }],
+    steps: ['黑豆浸泡过夜,豆浆机打成浆,不滤渣更营养'],
+  },
+  {
+    id: 'r_boiled_egg_white', name: '水煮蛋白', slot: 'protein', mealFit: ['breakfast'], tags: ['egg'],
+    ingredients: [{ foodId: 'f_egg_white', grams: 200, scalable: true }],
+    steps: ['鸡蛋煮熟取蛋白,约6个鸡蛋的蛋白'],
   },
 
   // ================= 蛋白 —— 午晚组 =================
@@ -275,6 +338,119 @@ export const RECIPES = [
     id: 'r_edamame_boiled', name: '盐水毛豆', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['soy'],
     ingredients: [{ foodId: 'f_edamame', grams: 180, scalable: true }],
     steps: ['毛豆剪角洗净', '盐水加八角煮8分钟,泡30分钟入味'],
+  },
+  {
+    id: 'r_mapo_tofu', name: '麻婆豆腐(少油版)', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['soy', 'spicy'],
+    ingredients: [
+      { foodId: 'f_tofu_firm', grams: 200, scalable: true },
+      { foodId: 'f_olive_oil', grams: 8, scalable: false },
+    ],
+    steps: ['豆腐切块盐水焯定型', '少油下豆瓣酱炒出红油,加水下豆腐煮5分钟', '水淀粉勾芡,撒花椒粉葱花'],
+  },
+  {
+    id: 'r_shrimp_broccoli', name: '虾仁炒西兰花', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood'],
+    ingredients: [
+      { foodId: 'f_shrimp', grams: 150, scalable: true },
+      { foodId: 'f_broccoli', grams: 80, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['虾仁开背去线,西兰花焯水1分钟', '少油快炒虾仁至变红,下西兰花同炒,加盐'],
+  },
+  {
+    id: 'r_boiled_fish_slices', name: '水煮鱼片', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood', 'spicy'],
+    ingredients: [
+      { foodId: 'f_basa', grams: 180, scalable: true },
+      { foodId: 'f_mung_bean_sprout', grams: 80, scalable: false },
+      { foodId: 'f_olive_oil', grams: 8, scalable: false },
+    ],
+    steps: ['鱼片用盐、蛋清、淀粉抓匀', '豆芽垫底,鱼片汆至变白捞出', '干辣椒花椒热油浇上'],
+  },
+  {
+    id: 'r_steamed_pork_rice_flour', name: '粉蒸里脊', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork'],
+    ingredients: [
+      { foodId: 'f_pork_loin', grams: 130, scalable: true },
+      { foodId: 'f_rice', grams: 20, scalable: true },
+    ],
+    steps: ['大米干锅炒至微黄,打成粗粉', '里脊切片裹米粉,加少量生抽', '上锅蒸40分钟'],
+  },
+  {
+    id: 'r_stir_fried_pork_liver', name: '爆炒猪肝', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork'],
+    ingredients: [
+      { foodId: 'f_pork_liver', grams: 120, scalable: true },
+      { foodId: 'f_olive_oil', grams: 8, scalable: false },
+    ],
+    steps: ['猪肝切薄片,清水泡去血水,料酒淀粉抓匀', '大火快炒30秒至变色,加洋葱青椒出锅'],
+  },
+  {
+    id: 'r_braised_beef_brisket', name: '红烧牛腩', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['beef'],
+    ingredients: [
+      { foodId: 'f_beef_brisket', grams: 120, scalable: true },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['牛腩焯水,少油煸炒上色', '加生抽老抽、八角、桂皮,炖90分钟至软烂'],
+  },
+  {
+    id: 'r_braised_chicken_wing', name: '红烧鸡翅', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['chicken'],
+    ingredients: [
+      { foodId: 'f_chicken_wing', grams: 150, scalable: true },
+      { foodId: 'f_olive_oil', grams: 3, scalable: false },
+    ],
+    steps: ['鸡翅划刀焯水', '少油煎至两面金黄,加生抽老抽冰糖焖15分钟'],
+  },
+  {
+    id: 'r_clam_steamed_egg', name: '蛤蜊蒸蛋', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood', 'egg'],
+    ingredients: [
+      { foodId: 'f_clam', grams: 150, scalable: true },
+      { foodId: 'f_egg', grams: 100, scalable: true },
+    ],
+    steps: ['蛤蜊吐沙焯水取肉', '鸡蛋打散加1.2倍温水,放入蛤蜊肉蒸10分钟'],
+  },
+  {
+    id: 'r_lamb_scallion', name: '葱爆羊肉', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_lamb_lean', grams: 130, scalable: true },
+      { foodId: 'f_olive_oil', grams: 6, scalable: false },
+    ],
+    steps: ['羊肉逆纹切片,生抽料酒腌10分钟', '大火爆炒,下大葱段翻匀即出锅'],
+  },
+  {
+    id: 'r_garlic_oyster', name: '蒜蓉蒸生蚝', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood'],
+    ingredients: [
+      { foodId: 'f_oyster', grams: 200, scalable: true },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['生蚝刷净撬开', '铺蒜蓉,水开后蒸5分钟', '淋少量生抽热油'],
+  },
+  {
+    id: 'r_crucian_tofu_soup', name: '鲫鱼豆腐汤', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood', 'soy'],
+    ingredients: [
+      { foodId: 'f_crucian', grams: 150, scalable: true },
+      { foodId: 'f_tofu_soft', grams: 100, scalable: true },
+      { foodId: 'f_olive_oil', grams: 4, scalable: false },
+    ],
+    steps: ['鲫鱼煎至两面微黄', '加开水大火滚10分钟至汤白,下豆腐再煮5分钟,加盐葱花'],
+  },
+  {
+    id: 'r_tofu_sheet_pork', name: '千张肉丝', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork', 'soy'],
+    ingredients: [
+      { foodId: 'f_tofu_sheet', grams: 80, scalable: true },
+      { foodId: 'f_pork_loin', grams: 80, scalable: true },
+      { foodId: 'f_olive_oil', grams: 6, scalable: false },
+    ],
+    steps: ['千张切丝焯水,里脊切丝腌10分钟', '少油滑炒肉丝,下千张丝、青椒丝同炒'],
+  },
+  {
+    id: 'r_razor_clam_blanched', name: '白灼蛏子', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood'],
+    ingredients: [{ foodId: 'f_razor_clam', grams: 250, scalable: true }],
+    steps: ['蛏子吐沙洗净', '水开加姜片料酒,煮2-3分钟开口即捞,蘸姜醋汁'],
+  },
+  {
+    id: 'r_braised_ribs', name: '红烧排骨', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork'],
+    ingredients: [
+      { foodId: 'f_pork_ribs', grams: 120, scalable: true },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['排骨焯水,少油煸炒,加生抽老抽冰糖', '加热水没过,炖50分钟收汁'],
   },
 
   // ================= 蔬菜(vegetable,固定份) =================
@@ -420,6 +596,104 @@ export const RECIPES = [
     ],
     steps: ['芹菜去叶切段,焯水1分钟', '蒜末爆香快炒,加盐'],
   },
+  {
+    id: 'r_garlic_broccoli', name: '蒜蓉西兰花', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_broccoli', grams: 200, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['西兰花掰小朵焯水1分钟', '蒜末爆香,大火快炒1分钟,加盐'],
+  },
+  {
+    id: 'r_wood_ear_salad', name: '凉拌木耳', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_wood_ear', grams: 200, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 3, scalable: false },
+    ],
+    steps: ['木耳泡发撕小朵,焯水2分钟', '加蒜末、生抽、醋、香油拌匀'],
+  },
+  {
+    id: 'r_kelp_salad', name: '凉拌海带丝', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_kelp', grams: 200, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 3, scalable: false },
+    ],
+    steps: ['海带切丝焯水3分钟', '加蒜末、生抽、醋、少许糖拌匀'],
+  },
+  {
+    id: 'r_bean_sprout_fry', name: '清炒豆芽', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_mung_bean_sprout', grams: 200, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['豆芽洗净沥干', '干辣椒爆香,大火快炒2分钟,加醋盐出锅'],
+  },
+  {
+    id: 'r_chrysanthemum_fry', name: '清炒茼蒿', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_chrysanthemum_greens', grams: 200, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['茼蒿洗净切段', '蒜末爆香,大火快炒1分钟,加盐'],
+  },
+  {
+    id: 'r_shepherd_fry', name: '清炒荠菜', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_shepherd_s_purse', grams: 200, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['荠菜洗净焯水10秒', '蒜末爆香快炒,加盐'],
+  },
+  {
+    id: 'r_bitter_melon_salad', name: '凉拌苦瓜', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_bitter_melon', grams: 150, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 3, scalable: false },
+    ],
+    steps: ['苦瓜去瓤切薄片,盐水焯1分钟过凉', '加蒜末、生抽、醋、香油拌匀'],
+  },
+  {
+    id: 'r_water_bamboo_fry', name: '清炒茭白', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_water_bamboo', grams: 150, scalable: false },
+      { foodId: 'f_olive_oil', grams: 5, scalable: false },
+    ],
+    steps: ['茭白去皮切片', '少油中火炒3分钟,加盐'],
+  },
+  {
+    id: 'r_lotus_root_salad', name: '凉拌藕片', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_lotus_root', grams: 150, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 3, scalable: false },
+    ],
+    steps: ['莲藕去皮切薄片,焯水1分钟过凉', '加蒜末、生抽、醋、香油拌匀'],
+  },
+  {
+    id: 'r_konjac_cucumber', name: '魔芋拌黄瓜', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_konjac', grams: 200, scalable: false },
+      { foodId: 'f_cucumber', grams: 100, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 3, scalable: false },
+    ],
+    steps: ['魔芋结焯水2分钟', '黄瓜拍块,加蒜末、生抽、醋、辣椒油拌匀'],
+  },
+  {
+    id: 'r_shrimp_skin_zucchini', name: '虾皮炒西葫芦', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: ['seafood'],
+    ingredients: [
+      { foodId: 'f_zucchini', grams: 200, scalable: false },
+      { foodId: 'f_dried_small_shrimp', grams: 10, scalable: false },
+      { foodId: 'f_olive_oil', grams: 4, scalable: false },
+    ],
+    steps: ['西葫芦切片', '虾皮爆香,下西葫芦炒2分钟,加盐'],
+  },
+  {
+    id: 'r_laver_soup', name: '紫菜汤', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [],
+    ingredients: [
+      { foodId: 'f_laver', grams: 5, scalable: false },
+      { foodId: 'f_flaxseed_oil', grams: 2, scalable: false },
+    ],
+    steps: ['水开下紫菜煮1分钟', '加盐、香油、葱花'],
+  },
 
   // ================= 水果(fruit,固定份) =================
   { id: 'r_apple_one', name: '苹果一个', slot: 'fruit', mealFit: ['breakfast'], tags: [],
@@ -442,6 +716,20 @@ export const RECIPES = [
     ingredients: [{ foodId: 'f_pomelo', grams: 200, scalable: false }], steps: ['去皮取肉'] },
   { id: 'r_watermelon_slice', name: '西瓜一块', slot: 'fruit', mealFit: ['breakfast'], tags: [],
     ingredients: [{ foodId: 'f_watermelon', grams: 300, scalable: false }], steps: ['切块直接吃'] },
+  { id: 'r_hami_melon', name: '哈密瓜两块', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_hami_melon', grams: 250, scalable: false }], steps: ['去皮切块'] },
+  { id: 'r_cherry_bowl', name: '樱桃一碗', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_cherry', grams: 150, scalable: false }], steps: ['洗净带柄吃'] },
+  { id: 'r_fresh_jujube', name: '鲜枣几颗', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_fresh_jujube', grams: 100, scalable: false }], steps: ['洗净直接吃'] },
+  { id: 'r_pineapple', name: '菠萝几块', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_pineapple', grams: 200, scalable: false }], steps: ['切片盐水泡10分钟'] },
+  { id: 'r_dragon_fruit', name: '火龙果半个', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_dragon_fruit', grams: 200, scalable: false }], steps: ['对半切开用勺吃'] },
+  { id: 'r_lychee', name: '荔枝几颗', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_lychee', grams: 150, scalable: false }], steps: ['剥壳直接吃'] },
+  { id: 'r_avocado_half', name: '牛油果半个', slot: 'fruit', mealFit: ['breakfast'], tags: [],
+    ingredients: [{ foodId: 'f_avocado', grams: 100, scalable: false }], steps: ['对半切开,撒少许黑胡椒或挤柠檬汁用勺吃'] },
 ]
 
 export const RECIPES_MAP = Object.fromEntries(RECIPES.map((r) => [r.id, r]))
