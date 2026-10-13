@@ -48,7 +48,26 @@
       <div v-if="modeHint" class="hint">{{ modeHint }}</div>
     </van-cell-group>
 
-    <van-cell-group inset title="营养细节(可选调整)">
+    <van-cell-group inset title="营养细节">
+      <van-field
+        v-model="presetLabel"
+        is-link
+        readonly
+        label="宏量比例预设"
+        placeholder="选择推荐比例"
+        @click="showPreset = true"
+      />
+      <van-popup v-model:show="showPreset" position="bottom" round>
+        <van-picker
+          :columns="presetColumns"
+          @confirm="onPresetConfirm"
+          @cancel="showPreset = false"
+        />
+      </van-popup>
+      <div v-if="presetHint" class="hint">{{ presetHint }}</div>
+      <div class="hint">
+        当前等效供能比:{{ macroSplitText }}。蛋白按体重定量(而非供能占比)更贴合增肌减脂需求,切换目标模式会自动套用推荐预设。
+      </div>
       <van-cell title="蛋白质" :value="`${form.proteinPerKg} g/kg 体重`" />
       <div class="slider-wrap">
         <van-slider
@@ -56,6 +75,7 @@
           :min="1.2"
           :max="2.5"
           :step="0.1"
+          @change="onManualMacro"
         />
       </div>
       <van-cell title="脂肪占比" :value="`${Math.round(form.fatRatio * 100)}% 总热量`" />
@@ -65,6 +85,7 @@
           :min="15"
           :max="35"
           :step="1"
+          @change="onManualMacro"
         />
       </div>
       <van-field
@@ -177,6 +198,8 @@ import { showToast, showConfirmDialog } from 'vant'
 import {
   ACTIVITY_LEVELS,
   GOAL_MODES,
+  MACRO_PRESETS,
+  MODE_PRESET,
   EXCLUDE_TAGS,
   MEALS,
   calcTargets,
@@ -211,6 +234,7 @@ const form = reactive({
   weight: profile.weight,
   activity: profile.activity,
   mode: profile.mode,
+  macroPreset: profile.macroPreset || 'custom',
   proteinPerKg: profile.proteinPerKg,
   fatRatio: profile.fatRatio,
   mealSplit: [...profile.mealSplit],
@@ -221,8 +245,10 @@ const splitInputs = ref(form.mealSplit.map((v) => Math.round(v * 100)))
 
 const activityColumns = ACTIVITY_LEVELS.map((a) => ({ text: a.label, value: a.value }))
 const modeColumns = GOAL_MODES.map((m) => ({ text: m.label, value: m.value }))
+const presetColumns = MACRO_PRESETS.map((p) => ({ text: p.label, value: p.value }))
 const showActivity = ref(false)
 const showMode = ref(false)
+const showPreset = ref(false)
 
 const activityLabel = computed(
   () => ACTIVITY_LEVELS.find((a) => a.value === form.activity)?.label || ''
@@ -275,10 +301,52 @@ function onActivityConfirm({ selectedValues }) {
   form.activity = selectedValues[0]
   showActivity.value = false
 }
+
+// ---- 宏量预设与模式联动 ----
+const presetLabel = computed(
+  () => MACRO_PRESETS.find((p) => p.value === form.macroPreset)?.label || '自定义'
+)
+const presetHint = computed(
+  () => MACRO_PRESETS.find((p) => p.value === form.macroPreset)?.hint || ''
+)
+
+function onPresetConfirm({ selectedValues }) {
+  const preset = MACRO_PRESETS.find((p) => p.value === selectedValues[0])
+  if (preset?.proteinPerKg != null) {
+    form.proteinPerKg = preset.proteinPerKg
+    form.fatRatio = preset.fatRatio
+    form.macroPreset = preset.value
+  }
+  showPreset.value = false
+}
+
+// 手动调滑块后视为自定义
+function onManualMacro() {
+  form.macroPreset = 'custom'
+}
+
 function onModeConfirm({ selectedValues }) {
   form.mode = selectedValues[0]
   showMode.value = false
+  // 模式联动:自动套用该模式的推荐宏量预设(仍可再微调)
+  const preset = MACRO_PRESETS.find((p) => p.value === MODE_PRESET[form.mode])
+  if (preset?.proteinPerKg != null) {
+    form.proteinPerKg = preset.proteinPerKg
+    form.fatRatio = preset.fatRatio
+    form.macroPreset = preset.value
+    showToast(`已套用"${preset.label}"预设,可在营养细节中微调`)
+  }
 }
+
+// 等效供能比(帮助没有"三大营养素"概念的使用者建立直觉)
+const macroSplitText = computed(() => {
+  const t = previewTargets.value
+  const kcal = t.kcal || 1
+  const p = Math.round(((t.protein * 4) / kcal) * 100)
+  const f = Math.round(((t.fat * 9) / kcal) * 100)
+  const c = Math.max(0, 100 - p - f)
+  return `蛋白 ${p}% · 碳水 ${c}% · 脂肪 ${f}%`
+})
 
 function mealLabel(key) {
   return MEALS.find((m) => m.key === key)?.label || key

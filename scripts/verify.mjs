@@ -231,5 +231,19 @@ check('小贴士数量合理且字段完整(10-20 条)', TIPS.length >= 10 && TI
 const tipIds = new Set(TIPS.map((t) => t.id))
 check('小贴士 id 无重复', tipIds.size === TIPS.length)
 
+// ---------- 12. 宏量预设 ----------
+const { MACRO_PRESETS, MODE_PRESET } = await import('../src/core/nutrition.js')
+const badPresets = MACRO_PRESETS.filter(
+  (p) =>
+    (p.value !== 'custom' &&
+      (!(p.proteinPerKg >= 1.0 && p.proteinPerKg <= 2.5) || !(p.fatRatio >= 0.15 && p.fatRatio <= 0.35)))
+)
+check('宏量预设数值在安全区间', badPresets.length === 0, badPresets.map((p) => p.value).join(','))
+check('模式联动映射完整', ['cut', 'maintain', 'bulk'].every((m) => MACRO_PRESETS.some((p) => p.value === MODE_PRESET[m])))
+// 抽查:套用 cut 预设后目标计算的蛋白符合预期
+const cutPreset = MACRO_PRESETS.find((p) => p.value === 'cut')
+const tCut = calcTargets({ gender: 'male', age: 30, height: 175, weight: 70, activity: 1.375, mode: 'cut', proteinPerKg: cutPreset.proteinPerKg, fatRatio: cutPreset.fatRatio })
+check('减脂预设蛋白 = 2.0g/kg × 70 = 140g', Math.abs(tCut.protein - 140) < 0.01, `got ${tCut.protein}`)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

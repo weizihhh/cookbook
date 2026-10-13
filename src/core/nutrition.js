@@ -14,6 +14,39 @@ export const GOAL_MODES = [
   { value: 'bulk', label: '增肌', adjust: 0.1, hint: '热量盈余10%,配合训练增肌' },
 ]
 
+// 宏量营养素预设:蛋白按 g/kg 定量、脂肪按供能占比、碳水补齐,
+// 均参照运动营养学常用区间整理;等效供能比随个人数据变化,UI 中实时展示
+export const MACRO_PRESETS = [
+  {
+    value: 'balanced', label: '均衡(膳食指南)',
+    proteinPerKg: 1.4, fatRatio: 0.27,
+    hint: '接近《中国居民膳食指南》的均衡结构,适合维持期与日常饮食',
+  },
+  {
+    value: 'cut', label: '减脂·保肌(高蛋白)',
+    proteinPerKg: 2.0, fatRatio: 0.25,
+    hint: '高蛋白保肌肉、增饱腹感,碳水相对较低',
+  },
+  {
+    value: 'bulk', label: '增肌·标准',
+    proteinPerKg: 1.8, fatRatio: 0.25,
+    hint: '蛋白修复肌肉,碳水支撑训练',
+  },
+  {
+    value: 'bulk_high_carb', label: '增肌·高碳',
+    proteinPerKg: 1.6, fatRatio: 0.2,
+    hint: '碳水优先供训练,约 4-5g/kg;网传"三倍碳水"≈3g/kg,属增肌碳水参考范围(3-6g/kg)的下限',
+  },
+  { value: 'custom', label: '自定义', proteinPerKg: null, fatRatio: null, hint: '手动调整下方滑块' },
+]
+
+// 目标模式切换时默认套用的预设
+export const MODE_PRESET = {
+  cut: 'cut',
+  maintain: 'balanced',
+  bulk: 'bulk',
+}
+
 export const EXCLUDE_TAGS = [
   { value: 'pork', label: '猪肉' },
   { value: 'beef', label: '牛肉' },
