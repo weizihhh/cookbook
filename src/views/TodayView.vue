@@ -26,42 +26,40 @@
         </div>
       </van-cell-group>
 
-      <!-- 目标概览 -->
+      <!-- 目标概览:热量 + 三大营养素逐行,每行进度条 + 达标状态 -->
       <van-cell-group inset style="margin-bottom: 12px">
         <template #title>
           <div class="target-header">
             <span>今日目标 · {{ modeLabel }}</span>
-            <span class="deviation" :class="deviationClass">
-              {{ deviationText }}
-            </span>
           </div>
         </template>
         <div class="target-body">
-          <div class="nutri-grid">
-            <div>
-              <div class="num">{{ totals.kcal }}</div>
-              <div class="label">热量 / {{ targets.kcal }}</div>
+          <div class="metric-row">
+            <div class="metric-head">
+              <span class="metric-name">热量</span>
+              <span class="metric-val"><b>{{ totals.kcal }}</b> / {{ targets.kcal }} 千卡</span>
+              <span class="metric-status" :class="deviationClass">{{ deviationText }}</span>
             </div>
-            <div>
-              <div class="num">{{ totals.protein }}g</div>
-              <div class="label">蛋白 / {{ targets.protein }}</div>
-            </div>
-            <div>
-              <div class="num">{{ totals.carbs }}g</div>
-              <div class="label">碳水 / {{ targets.carbs }}</div>
-            </div>
-            <div>
-              <div class="num">{{ totals.fat }}g</div>
-              <div class="label">脂肪 / {{ targets.fat }}</div>
-            </div>
+            <van-progress
+              :percentage="kcalPercentage"
+              :show-pivot="false"
+              color="#1989fa"
+              track-color="#ebedf0"
+            />
           </div>
-          <van-progress
-            :percentage="kcalPercentage"
-            :show-pivot="false"
-            color="#1989fa"
-            track-color="#ebedf0"
-            style="margin-top: 10px"
-          />
+          <div v-for="m in macroRows" :key="m.key" class="metric-row">
+            <div class="metric-head">
+              <span class="metric-name">{{ m.label }}</span>
+              <span class="metric-val"><b>{{ m.actual }}</b> / {{ m.target }} g</span>
+              <span class="metric-status" :class="m.statusClass">{{ m.statusText }}</span>
+            </div>
+            <van-progress
+              :percentage="m.pct"
+              :show-pivot="false"
+              :color="m.color"
+              track-color="#ebedf0"
+            />
+          </div>
           <div v-if="hasSkippedMeal" class="skip-note">已跳过的餐次不计入上方合计</div>
         </div>
       </van-cell-group>
@@ -382,8 +380,8 @@ const kcalPercentage = computed(() =>
 )
 const allSkipped = computed(() => MEALS.every((m) => mealActuals.value[m.key]?.skipped))
 const deviationClass = computed(() => {
-  if (!summary.value) return 'ok'
-  if (allSkipped.value) return 'ok'
+  if (!summary.value) return 'none'
+  if (allSkipped.value) return 'none'
   const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return 'ok'
   return d > 0 ? 'over' : 'under'
@@ -393,7 +391,7 @@ const deviationText = computed(() => {
   if (allSkipped.value) return '今日未进食'
   const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return '达标 ✓'
-  return d > 0 ? `热量超 ${d}%` : `热量低 ${-d}%`
+  return d > 0 ? `超 ${d}%` : `低 ${-d}%`
 })
 
 const mealTargets = computed(() =>
@@ -443,6 +441,36 @@ const totals = computed(() => {
   return out
 })
 const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]?.skipped))
+
+// 三大营养素逐行展示:实际/目标 + 进度条 + 达标状态;±10% 内视为达标(与热量口径一致)
+const MACRO_META = [
+  { key: 'protein', label: '蛋白质', color: '#1989fa' },
+  { key: 'carbs', label: '碳水', color: '#07c160' },
+  { key: 'fat', label: '脂肪', color: '#ff976a' },
+]
+const macroRows = computed(() =>
+  MACRO_META.map((meta) => {
+    const actual = totals.value[meta.key] ?? 0
+    const target = targets.value[meta.key] || 0
+    const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0
+    let statusClass = 'none'
+    let statusText = '—'
+    if (summary.value && !allSkipped.value && target > 0) {
+      const d = Math.round(((actual - target) / target) * 100)
+      if (Math.abs(d) <= 10) {
+        statusClass = 'ok'
+        statusText = '达标 ✓'
+      } else if (d > 0) {
+        statusClass = 'over'
+        statusText = `超 ${d}%`
+      } else {
+        statusClass = 'under'
+        statusText = `低 ${-d}%`
+      }
+    }
+    return { ...meta, actual, target, pct, statusClass, statusText }
+  })
+)
 
 function generate() {
   week.generateDay(today)
@@ -650,17 +678,42 @@ function ingredientText(item) {
   font-weight: normal;
   text-align: right;
 }
-.deviation {
-  font-size: 12px;
-  font-weight: normal;
+.metric-row + .metric-row {
+  margin-top: 12px;
 }
-.deviation.ok {
+.metric-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.metric-name {
+  flex: 0 0 3.5em;
+  font-size: 13px;
+  color: #323233;
+}
+.metric-val {
+  flex: 1;
+  font-size: 13px;
+  color: #646566;
+}
+.metric-val b {
+  color: #323233;
+  font-weight: 600;
+}
+.metric-status {
+  font-size: 12px;
+}
+.metric-status.none {
+  color: #c8c9cc;
+}
+.metric-status.ok {
   color: #07c160;
 }
-.deviation.over {
+.metric-status.over {
   color: #ee0a24;
 }
-.deviation.under {
+.metric-status.under {
   color: #ff976a;
 }
 .skip-note {

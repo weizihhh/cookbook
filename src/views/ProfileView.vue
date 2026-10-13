@@ -178,16 +178,7 @@
     </van-cell-group>
 
     <van-cell-group inset title="数据管理">
-      <van-cell title="导出数据" is-link @click="doExport" />
-      <van-cell title="导入数据" is-link @click="triggerImport" />
       <van-cell title="恢复默认设置" is-link @click="doReset" />
-      <input
-        ref="fileInput"
-        type="file"
-        accept="application/json,.json"
-        style="display: none"
-        @change="onImportFile"
-      />
     </van-cell-group>
   </div>
 </template>
@@ -209,7 +200,7 @@ import { useWeekStore } from '../stores/week'
 import { useWeightStore } from '../stores/weight'
 import { useCheckinStore } from '../stores/checkin'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { exportAll, importFile, removeState } from '../utils/storage'
+import { removeState } from '../utils/storage'
 import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
@@ -377,54 +368,6 @@ watch(
 )
 
 // ---- 数据管理 ----
-const fileInput = ref(null)
-
-function doExport() {
-  exportAll({
-    version: 3,
-    exportedAt: new Date().toISOString(),
-    profile: profile.$state,
-    week: { weekStart: plan.weekStart, days: plan.days },
-    checkin: checkin.$state,
-    weight: weight.$state,
-    customFoods: customFoods.$state,
-  })
-  showToast('已导出')
-}
-
-function triggerImport() {
-  fileInput.value?.click()
-}
-
-async function onImportFile(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  try {
-    const data = await importFile(file)
-    if (!data?.profile) throw new Error('缺少 profile 数据')
-    profile.update(data.profile)
-    const { saveState } = await import('../utils/storage')
-    if (data.week?.days) saveState('week', data.week)
-    // 兼容 v0.1 备份的单日 plan 字段
-    else if (data.plan?.meals) {
-      const { weekStartOf } = await import('../utils/date')
-      saveState('week', { weekStart: weekStartOf(data.plan.date), days: { [data.plan.date]: data.plan.meals } })
-    }
-    if (data.checkin) saveState('checkin', data.checkin)
-    if (data.weight?.records) saveState('weight', data.weight)
-    // v3 起含自定义食物;v2 及更早备份没有该层,导入为空不报错
-    if (Array.isArray(data.customFoods?.foods)) {
-      saveState('customFoods', { foods: data.customFoods.foods, sources: data.customFoods.sources || [] })
-    }
-    showToast('导入成功,即将刷新')
-    setTimeout(() => window.location.reload(), 800)
-  } catch (err) {
-    showToast(err.message || '导入失败')
-  } finally {
-    e.target.value = ''
-  }
-}
-
 async function doReset() {
   try {
     await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置、周计划、打卡、体重记录与自定义食物,确定?' })
