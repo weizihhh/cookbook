@@ -223,5 +223,13 @@ check('水煮西兰花应为抗炎', RECIPES_MAP['r_broccoli_boiled']?.antiInfl 
 check('白灼虾应不标抗炎', RECIPES_MAP['r_boiled_shrimp']?.antiInfl === false)
 check('清蒸三文鱼应为抗炎', RECIPES_MAP['r_pan_fried_salmon']?.antiInfl === true)
 
+// ---------- 11. 营养小贴士 ----------
+const { TIPS } = await import('../src/data/tips.js')
+const badTips = TIPS.filter((t) => !t.id || !t.title || !t.body || t.body.length < 10)
+check('小贴士数量合理且字段完整(10-20 条)', TIPS.length >= 10 && TIPS.length <= 20 && badTips.length === 0,
+  badTips.map((t) => t.id).join(','))
+const tipIds = new Set(TIPS.map((t) => t.id))
+check('小贴士 id 无重复', tipIds.size === TIPS.length)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

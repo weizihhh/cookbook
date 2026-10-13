@@ -147,6 +147,15 @@
       <van-cell v-if="!weightDesc.length" title="暂无记录" label="在今日页快捷记录体重" />
     </van-cell-group>
 
+    <van-cell-group inset title="营养小贴士">
+      <van-collapse v-model:active="activeTips">
+        <van-collapse-item v-for="t in TIPS" :key="t.id" :title="t.title" :name="t.id">
+          <div class="tip-text">{{ t.body }}</div>
+        </van-collapse-item>
+      </van-collapse>
+      <div class="hint">基于公开营养学共识的科普参考,非医疗建议;个体差异大,有基础疾病请咨询医生或注册营养师。</div>
+    </van-cell-group>
+
     <van-cell-group inset title="数据管理">
       <van-cell title="导出数据" is-link @click="doExport" />
       <van-cell title="导入数据" is-link @click="triggerImport" />
@@ -177,11 +186,13 @@ import { useWeekStore } from '../stores/week'
 import { useWeightStore } from '../stores/weight'
 import { useCheckinStore } from '../stores/checkin'
 import { exportAll, importFile } from '../utils/storage'
+import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
 const plan = useWeekStore()
 const weight = useWeightStore()
 const checkin = useCheckinStore()
+const activeTips = ref([])
 
 const weightDesc = computed(() => [...weight.records].reverse())
 function changeClass(diff) {
@@ -361,6 +372,11 @@ async function doReset() {
 }
 .tags {
   padding: 10px 12px;
+}
+.tip-text {
+  font-size: 13px;
+  color: #646566;
+  line-height: 1.7;
 }
 .chg-down {
   color: #07c160;

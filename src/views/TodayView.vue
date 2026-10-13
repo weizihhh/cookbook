@@ -12,6 +12,20 @@
     </van-empty>
 
     <template v-else>
+      <!-- 每日贴士 -->
+      <van-cell-group inset style="margin-bottom: 12px">
+        <template #title>
+          <div class="target-header">
+            <span>💡 每日一读</span>
+            <span class="tips-more" @click="$router.push('/profile')">全部贴士 →</span>
+          </div>
+        </template>
+        <div class="tips-body">
+          <div class="tips-title">{{ dailyTip.title }}</div>
+          <div class="tips-text">{{ dailyTip.body }}</div>
+        </div>
+      </van-cell-group>
+
       <!-- 目标概览 -->
       <van-cell-group inset style="margin-bottom: 12px">
         <template #title>
@@ -215,13 +229,20 @@ import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
-import { todayStr } from '../utils/date'
+import { todayStr, parseDate } from '../utils/date'
+import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
 const week = useWeekStore()
 const checkin = useCheckinStore()
 const weight = useWeightStore()
 const today = todayStr()
+
+// 按日期轮换,一天一条看完全部
+const dailyTip = computed(() => {
+  const dayNumber = Math.floor(parseDate(today).getTime() / 86400000)
+  return TIPS[dayNumber % TIPS.length]
+})
 
 const targets = computed(() => profile.targets)
 const modeLabel = computed(
@@ -418,6 +439,24 @@ function ingredientText(item) {
   flex: 1;
   font-size: 11px;
   color: #c8c9cc;
+}
+.tips-more {
+  font-size: 12px;
+  color: #1989fa;
+  font-weight: normal;
+}
+.tips-body {
+  padding: 8px 16px 12px;
+}
+.tips-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.tips-text {
+  font-size: 13px;
+  color: #646566;
+  line-height: 1.7;
 }
 .detail {
   padding: 16px;
