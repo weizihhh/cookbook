@@ -124,7 +124,12 @@
               {{ f.name }}
               <span class="shopping-days">{{ f.days }}天用到</span>
             </template>
-            <template #value>{{ f.grams }}g<span class="jin">(约{{ gramsToJin(f.grams) }})</span></template>
+            <template #value>
+              {{ f.grams }}g<span class="jin">(约{{ gramsToJin(f.grams) }})</span>
+              <div v-if="FOODS_MAP[f.foodId]?.unit" class="unit-line">
+                ≈ {{ Math.max(1, Math.round(f.grams / FOODS_MAP[f.foodId].unitGrams)) }}{{ FOODS_MAP[f.foodId].unit }}
+              </div>
+            </template>
           </van-cell>
         </van-cell-group>
         <van-empty v-if="!shoppingGroups.length" description="暂无数据" />
@@ -364,5 +369,9 @@ function gramsToJin(g) {
   font-size: 11px;
   color: #969799;
   margin-left: 3px;
+}
+.unit-line {
+  font-size: 11px;
+  color: #1989fa;
 }
 </style>

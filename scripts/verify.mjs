@@ -257,5 +257,33 @@ check('makeBaselineItem 返回基准份且不缩放', baseOk, JSON.stringify(bas
 const baselineNutrition = computeNutrition(baseline.ingredients, FOODS_MAP)
 check('基准份营养 = 150g鸡胸+5g油 ≈ 244千卡', baselineNutrition.kcal === 244, `got ${baselineNutrition.kcal}`)
 
+// ---------- 14. 添加菜品累加 ----------
+const { addItemToMeal } = await import('../src/core/planner.js')
+const meals4 = {
+  breakfast: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
+}
+const r1 = addItemToMeal(meals4, 'breakfast', RECIPES_MAP['r_boiled_egg'])
+check('重复添加返回 merged', r1 === 'merged')
+const eggGrams = meals4.breakfast[0].ingredients[0].grams
+check('两次鸡蛋累加为 200g(约4个)', eggGrams === 200, `got ${eggGrams}`)
+const r2 = addItemToMeal(meals4, 'breakfast', RECIPES_MAP['r_banana_one'])
+check('新菜品返回 added 且条目+1', r2 === 'added' && meals4.breakfast.length === 2)
+const eggOnly = computeNutrition(meals4.breakfast[0].ingredients, FOODS_MAP)
+check('200g 鸡蛋 ≈ 26.6g 蛋白(4个鸡蛋)', Math.abs(eggOnly.protein - 26.6) < 0.1, `got ${eggOnly.protein}`)
+
+// ---------- 15. 生活单位 ----------
+const { formatFoodAmount } = await import('../src/data/foods.js')
+const unitFoods = FOODS.filter((f) => f.unit)
+check('带单位食材数量合理(15-25)', unitFoods.length >= 15 && unitFoods.length <= 25, `got ${unitFoods.length}`)
+const badUnit = unitFoods.filter((f) => !(f.unitGrams >= 10 && f.unitGrams <= 500))
+check('单位换算克数在合理区间', badUnit.length === 0, badUnit.map((f) => f.name).join(','))
+check('4 个鸡蛋显示', formatFoodAmount(FOODS_MAP['f_egg'], 200) === '4个(200g)')
+check('无单位食材显示纯克数', formatFoodAmount(FOODS_MAP['f_chicken_breast'], 150) === '150g')
+check('带克数添加(4个鸡蛋=200g)', (() => {
+  meals4.lunch = []
+  const r = addItemToMeal(meals4, 'lunch', RECIPES_MAP['r_boiled_egg'], [{ foodId: 'f_egg', grams: 200, scalable: true }])
+  return r === 'added' && meals4.lunch[0].ingredients[0].grams === 200
+})())
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

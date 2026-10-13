@@ -48,6 +48,7 @@
           >
             <template #label>
               每 100g
+              <span v-if="f.unit" class="unit-hint">· 1{{ f.unit }}≈{{ f.unitGrams }}g</span>
               <van-tag v-if="f.antiInfl" color="#07c160" size="medium" style="margin-left: 2px">抗炎</van-tag>
             </template>
             <template #value>
@@ -147,6 +148,10 @@ function openRecipe(r) {
 .sub {
   font-size: 11px;
   color: #969799;
+}
+.unit-hint {
+  font-size: 11px;
+  color: #1989fa;
 }
 .detail {
   padding: 16px;

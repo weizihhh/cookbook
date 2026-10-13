@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, generateWeekPlan, swapSlotItem, makeBaselineItem, summarizeDay } from '../core/planner'
+import { generateDayPlan, generateWeekPlan, swapSlotItem, addItemToMeal, summarizeDay } from '../core/planner'
 import { useProfileStore } from './profile'
 import { loadState, saveState } from '../utils/storage'
 import { todayStr, weekStartOf, addDays } from '../utils/date'
@@ -101,14 +101,18 @@ export const useWeekStore = defineStore('week', {
       this.persist()
     },
     // ---- 自定义编辑:添加/移除菜品、改克数(记录实际进食) ----
-    /** 添加菜品(基准份,不按目标缩放) */
+    /** 添加菜品(基准份;同餐已有同食谱则克数累加) */
     addItem(date, mealKey, recipeId) {
+      return this.addItemCustom(date, mealKey, recipeId, null)
+    },
+    /** 添加菜品并指定各食材克数 */
+    addItemCustom(date, mealKey, recipeId, ingredients) {
       const meals = this.days[date]
       const recipe = RECIPES_MAP[recipeId]
-      if (!meals || !recipe) return false
-      meals[mealKey].push(makeBaselineItem(recipe))
-      this.persist()
-      return true
+      if (!meals || !recipe) return null
+      const result = addItemToMeal(meals, mealKey, recipe, ingredients)
+      if (result) this.persist()
+      return result
     },
     /** 移除某餐第 index 个菜品 */
     removeItem(date, mealKey, index) {

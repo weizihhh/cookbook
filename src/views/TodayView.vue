@@ -120,7 +120,8 @@
             <div class="meal-header">
               <span>{{ meal.label }}</span>
               <span class="meal-target">
-                目标 {{ mealTargets[meal.key].kcal }} 千卡 · 蛋白 {{ mealTargets[meal.key].protein }}g
+                实际 {{ mealActuals[meal.key].kcal }} / {{ mealTargets[meal.key].kcal }} 千卡
+                · 蛋白 {{ mealActuals[meal.key].protein }} / {{ mealTargets[meal.key].protein }}g
                 <van-tag
                   v-if="checkin.statusOf(today, meal.key)"
                   :type="checkin.statusOf(today, meal.key) === 'done' ? 'success' : 'default'"
@@ -146,8 +147,7 @@
               </template>
               <template #label>
                 {{ ingredientText(item) }} · {{ itemNutrition(item).kcal }} 千卡
-              </template>
-            </van-cell>
+              </template>            </van-cell>
             <van-cell v-else title="该槽位没有可用食谱" label="排除项太多,去设置里调整偏好" />
           </template>
           <van-cell
@@ -193,9 +193,24 @@
         <van-cell v-for="ing in detailItem.ingredients" :key="ing.foodId">
           <template #title>
             {{ FOODS_MAP[ing.foodId]?.name }}
+            <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
           </template>
+          <template #label>{{ ing.grams }}g</template>
           <template #value>
+            <!-- 个数型食材按"个"步进,其余按 5g 步进 -->
             <van-stepper
+              v-if="unitOf(ing.foodId)"
+              :model-value="Math.round((ing.grams / unitGramsOf(ing.foodId)) * 10) / 10"
+              :min="1"
+              :max="Math.ceil(1000 / unitGramsOf(ing.foodId))"
+              :step="1"
+              :decimal-length="unitGramsOf(ing.foodId) >= 100 ? 1 : 0"
+              input-width="40px"
+              button-size="24px"
+              @change="(v) => onGramsChange(ing.foodId, v * unitGramsOf(ing.foodId))"
+            />
+            <van-stepper
+              v-else
               :model-value="ing.grams"
               :min="5"
               :max="1000"
@@ -252,6 +267,58 @@
       </div>
     </van-popup>
 
+    <!-- 添加确认:先定克数再入餐 -->
+    <van-popup v-model:show="addConfirmShow" position="bottom" round :style="{ maxHeight: '70%' }">
+      <div v-if="addDraft" class="detail">
+        <div class="detail-title">
+          添加:{{ RECIPES_MAP[addDraft.recipeId]?.name }}
+          <van-tag v-if="RECIPES_MAP[addDraft.recipeId]?.antiInfl" color="#07c160" size="large" style="vertical-align: 2px">抗炎</van-tag>
+        </div>
+        <van-cell title="用量调整" />
+        <van-cell v-for="ing in addDraft.ingredients" :key="ing.foodId">
+          <template #title>
+            {{ FOODS_MAP[ing.foodId]?.name }}
+            <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
+          </template>
+          <template #label>{{ ing.grams }}g</template>
+          <template #value>
+            <van-stepper
+              v-if="unitOf(ing.foodId)"
+              :model-value="Math.round((ing.grams / unitGramsOf(ing.foodId)) * 10) / 10"
+              :min="1"
+              :max="Math.ceil(1000 / unitGramsOf(ing.foodId))"
+              :step="1"
+              :decimal-length="unitGramsOf(ing.foodId) >= 100 ? 1 : 0"
+              input-width="40px"
+              button-size="24px"
+              @change="(v) => (ing.grams = Math.round(v * unitGramsOf(ing.foodId)))"
+            />
+            <van-stepper
+              v-else
+              :model-value="ing.grams"
+              :min="5"
+              :max="1000"
+              :step="5"
+              integer
+              input-width="44px"
+              button-size="24px"
+              @change="(v) => (ing.grams = v)"
+            />
+          </template>
+        </van-cell>
+        <div class="nutri-grid" style="margin: 10px 0">
+          <div><div class="num">{{ draftNutrition.kcal }}</div><div class="label">千卡</div></div>
+          <div><div class="num">{{ draftNutrition.protein }}g</div><div class="label">蛋白质</div></div>
+          <div><div class="num">{{ draftNutrition.carbs }}g</div><div class="label">碳水</div></div>
+          <div><div class="num">{{ draftNutrition.fat }}g</div><div class="label">脂肪</div></div>
+        </div>
+        <div style="display: flex; gap: 10px; margin: 12px 0">
+          <van-button block @click="addConfirmShow = false">取消</van-button>
+          <van-button block type="primary" @click="confirmAddDraft">添加</van-button>
+        </div>
+      </div>
+    </van-popup>
+
     <!-- 打卡选择 -->
     <van-action-sheet
       v-model:show="checkinShow"
@@ -268,7 +335,7 @@ import { ref, computed } from 'vue'
 import { showToast } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
 import { SLOT_LABELS, computeNutrition } from '../core/planner'
-import { FOODS_MAP } from '../data/foods'
+import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
@@ -320,6 +387,23 @@ const deviationText = computed(() => {
 const mealTargets = computed(() =>
   Object.fromEntries(targets.value.meals.map((m) => [m.key, m]))
 )
+
+// 每餐实际合计(随添加/移除/改克数实时变化)
+const mealActuals = computed(() => {
+  const out = {}
+  for (const m of MEALS) {
+    const items = todayMeals.value?.[m.key] || []
+    const total = { kcal: 0, protein: 0 }
+    for (const it of items) {
+      if (!it) continue
+      const n = computeNutrition(it.ingredients, FOODS_MAP)
+      total.kcal += n.kcal
+      total.protein += n.protein
+    }
+    out[m.key] = { kcal: Math.round(total.kcal), protein: Math.round(total.protein) }
+  }
+  return out
+})
 
 function generate() {
   week.generateDay(today)
@@ -408,6 +492,13 @@ function doSwap() {
 }
 
 // ---- 详情编辑:改克数 / 移除 ----
+function unitOf(foodId) {
+  return FOODS_MAP[foodId]?.unit || null
+}
+function unitGramsOf(foodId) {
+  return FOODS_MAP[foodId]?.unitGrams || 100
+}
+
 function onGramsChange(foodId, v) {
   week.updateGrams(today, detailMealKey.value, detailIndex.value, foodId, v)
 }
@@ -453,11 +544,34 @@ function baseKcal(recipe) {
 }
 
 function doAdd(recipe) {
-  const ok = week.addItem(today, addMealKey.value, recipe.id)
-  if (ok) {
-    showToast(`已添加:${recipe.name}`)
-    addShow.value = false
+  // 打开确认弹层:先调整克数(个数型按"个"),再确认入餐
+  addDraft.value = {
+    recipeId: recipe.id,
+    slot: recipe.slot,
+    ingredients: recipe.ingredients.map((ing) => ({ ...ing })),
   }
+  addShow.value = false
+  addConfirmShow.value = true
+}
+
+const addConfirmShow = ref(false)
+const addDraft = ref(null)
+const draftNutrition = computed(() =>
+  addDraft.value ? computeNutrition(addDraft.value.ingredients, FOODS_MAP) : {}
+)
+
+function confirmAddDraft() {
+  if (!addDraft.value) return
+  const recipe = RECIPES_MAP[addDraft.value.recipeId]
+  const result = week.addItemCustom(today, addMealKey.value, recipe.id, addDraft.value.ingredients)
+  if (result === 'added') {
+    showToast(`已添加:${recipe.name}`)
+  } else if (result === 'merged') {
+    const main = week.mealsOf(today)?.[addMealKey.value]?.find((it) => it.recipeId === recipe.id)
+    const mainIng = main?.ingredients.find((i) => i.scalable) || main?.ingredients[0]
+    showToast(`已累加:${recipe.name}(共 ${formatFoodAmount(FOODS_MAP[mainIng?.foodId], mainIng?.grams || 0)})`)
+  }
+  addConfirmShow.value = false
 }
 
 // ---- 列表辅助 ----
@@ -469,7 +583,7 @@ function itemNutrition(item) {
 }
 function ingredientText(item) {
   return item.ingredients
-    .map((ing) => `${FOODS_MAP[ing.foodId]?.name || ''}${ing.grams}g`)
+    .map((ing) => `${FOODS_MAP[ing.foodId]?.name || ''} ${formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams)}`)
     .join(' + ')
 }
 </script>
@@ -486,9 +600,10 @@ function ingredientText(item) {
   padding: 4px 0;
 }
 .meal-target {
-  font-size: 12px;
+  font-size: 11px;
   color: #969799;
   font-weight: normal;
+  text-align: right;
 }
 .deviation {
   font-size: 12px;
@@ -570,6 +685,10 @@ function ingredientText(item) {
 .add-kcal {
   font-size: 12px;
   color: #969799;
+}
+.unit-hint {
+  font-size: 11px;
+  color: #1989fa;
 }
 .detail {
   padding: 16px;

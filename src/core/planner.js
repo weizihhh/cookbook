@@ -315,6 +315,28 @@ export function makeBaselineItem(recipe) {
   }
 }
 
+/**
+ * 向一餐添加菜品:已有同食谱则克数累加(吃 4 个鸡蛋不必加 4 遍条目)
+ * @param ingredients 可选,自定义克数的食材表;缺省用食谱基准份
+ * @returns 'added' | 'merged' | null(餐不存在)
+ */
+export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
+  const list = meals?.[mealKey]
+  if (!list) return null
+  const ings = (ingredients || recipe.ingredients).map((i) => ({ ...i }))
+  const exist = list.find((it) => it.recipeId === recipe.id)
+  if (exist) {
+    for (const ing of ings) {
+      const target = exist.ingredients.find((i) => i.foodId === ing.foodId)
+      if (target) target.grams += ing.grams
+      else exist.ingredients.push({ ...ing })
+    }
+    return 'merged'
+  }
+  list.push({ recipeId: recipe.id, slot: recipe.slot, ingredients: ings })
+  return 'added'
+}
+
 /** 汇总全天营养与目标偏差 */
 export function summarizeDay(dayPlan, foods, targets) {
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }

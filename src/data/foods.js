@@ -13,7 +13,8 @@ export const FOOD_CATEGORIES = [
   { value: 'oil_nuts', label: '油脂坚果' },
 ]
 
-// { id, name, category, kcal, protein, carbs, fat }  —— 营养均为每100g
+// { id, name, category, kcal, protein, carbs, fat, unit?, unitGrams? }  —— 营养均为每100g
+// unit/unitGrams:常见生活单位及换算(如鸡蛋 1个=50g),编辑与展示按生活习惯走
 const RAW_FOODS = [
   // ---------- 谷物主食 ----------
   { id: 'f_rice', name: '大米(生)', category: 'grain', kcal: 346, protein: 7.4, carbs: 77.9, fat: 0.8 },
@@ -25,9 +26,9 @@ const RAW_FOODS = [
   { id: 'f_pasta', name: '意大利面(干)', category: 'grain', kcal: 371, protein: 13.0, carbs: 75.0, fat: 1.5 },
   { id: 'f_rice_noodle', name: '米粉(干)', category: 'grain', kcal: 348, protein: 7.3, carbs: 78.0, fat: 0.3 },
   { id: 'f_quinoa', name: '藜麦(干)', category: 'grain', kcal: 368, protein: 14.0, carbs: 64.0, fat: 6.0 },
-  { id: 'f_whole_wheat_bread', name: '全麦面包', category: 'grain', kcal: 250, protein: 9.0, carbs: 45.0, fat: 4.0 },
-  { id: 'f_steamed_bun', name: '馒头', category: 'grain', kcal: 223, protein: 7.0, carbs: 47.0, fat: 1.1 },
-  { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2 },
+  { id: 'f_whole_wheat_bread', name: '全麦面包', category: 'grain', kcal: 250, protein: 9.0, carbs: 45.0, fat: 4.0, unit: '片', unitGrams: 35 },
+  { id: 'f_steamed_bun', name: '馒头', category: 'grain', kcal: 223, protein: 7.0, carbs: 47.0, fat: 1.1, unit: '个', unitGrams: 100 },
+  { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200 },
   { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 90, protein: 1.1, carbs: 21.3, fat: 0.2 },
   { id: 'f_purple_potato', name: '紫薯', category: 'grain', kcal: 82, protein: 1.3, carbs: 18.5, fat: 0.2 },
   { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2 },
@@ -77,12 +78,12 @@ const RAW_FOODS = [
   { id: 'f_pomfret', name: '鲳鱼', category: 'seafood', kcal: 140, protein: 18.5, carbs: 0, fat: 7.0 },
 
   // ---------- 蛋奶豆制品 ----------
-  { id: 'f_egg', name: '鸡蛋', category: 'egg_dairy_soy', kcal: 144, protein: 13.3, carbs: 2.8, fat: 8.8 },
+  { id: 'f_egg', name: '鸡蛋', category: 'egg_dairy_soy', kcal: 144, protein: 13.3, carbs: 2.8, fat: 8.8, unit: '个', unitGrams: 50 },
   { id: 'f_egg_white', name: '鸡蛋白', category: 'egg_dairy_soy', kcal: 60, protein: 11.6, carbs: 3.1, fat: 0.1 },
-  { id: 'f_milk', name: '牛奶(全脂)', category: 'egg_dairy_soy', kcal: 60, protein: 3.2, carbs: 4.8, fat: 3.5 },
-  { id: 'f_milk_low_fat', name: '牛奶(低脂)', category: 'egg_dairy_soy', kcal: 45, protein: 3.4, carbs: 5.0, fat: 1.7 },
+  { id: 'f_milk', name: '牛奶(全脂)', category: 'egg_dairy_soy', kcal: 60, protein: 3.2, carbs: 4.8, fat: 3.5, unit: '杯', unitGrams: 250 },
+  { id: 'f_milk_low_fat', name: '牛奶(低脂)', category: 'egg_dairy_soy', kcal: 45, protein: 3.4, carbs: 5.0, fat: 1.7, unit: '杯', unitGrams: 250 },
   { id: 'f_yogurt_plain', name: '无糖酸奶', category: 'egg_dairy_soy', kcal: 62, protein: 3.5, carbs: 5.5, fat: 2.7 },
-  { id: 'f_soy_milk', name: '豆浆(无糖)', category: 'egg_dairy_soy', kcal: 31, protein: 3.0, carbs: 1.2, fat: 1.6 },
+  { id: 'f_soy_milk', name: '豆浆(无糖)', category: 'egg_dairy_soy', kcal: 31, protein: 3.0, carbs: 1.2, fat: 1.6, unit: '杯', unitGrams: 250 },
   { id: 'f_tofu_firm', name: '北豆腐', category: 'egg_dairy_soy', kcal: 116, protein: 12.2, carbs: 3.0, fat: 4.8 },
   { id: 'f_tofu_soft', name: '内酯豆腐', category: 'egg_dairy_soy', kcal: 50, protein: 5.0, carbs: 2.5, fat: 2.5 },
   { id: 'f_tofu_dried', name: '豆腐干', category: 'egg_dairy_soy', kcal: 140, protein: 16.0, carbs: 4.0, fat: 6.5 },
@@ -90,7 +91,7 @@ const RAW_FOODS = [
   { id: 'f_chickpea_cooked', name: '鹰嘴豆(熟)', category: 'egg_dairy_soy', kcal: 164, protein: 8.9, carbs: 27.0, fat: 2.6 },
   { id: 'f_edamame', name: '毛豆(鲜)', category: 'egg_dairy_soy', kcal: 131, protein: 13.1, carbs: 10.5, fat: 5.0 },
   { id: 'f_yuba', name: '腐竹', category: 'egg_dairy_soy', kcal: 461, protein: 44.6, carbs: 22.3, fat: 21.7 },
-  { id: 'f_quail_egg', name: '鹌鹑蛋', category: 'egg_dairy_soy', kcal: 160, protein: 12.8, carbs: 2.1, fat: 11.1 },
+  { id: 'f_quail_egg', name: '鹌鹑蛋', category: 'egg_dairy_soy', kcal: 160, protein: 12.8, carbs: 2.1, fat: 11.1, unit: '个', unitGrams: 10 },
   { id: 'f_tofu_sheet', name: '千张', category: 'egg_dairy_soy', kcal: 260, protein: 24.0, carbs: 5.0, fat: 16.0 },
   { id: 'f_black_bean_dry', name: '黑豆(干)', category: 'egg_dairy_soy', kcal: 381, protein: 36.0, carbs: 33.0, fat: 16.0 },
   { id: 'f_cottage_cheese', name: '茅屋奶酪', category: 'egg_dairy_soy', kcal: 80, protein: 12.0, carbs: 3.0, fat: 2.0 },
@@ -145,15 +146,15 @@ const RAW_FOODS = [
   { id: 'f_amaranth', name: '苋菜', category: 'vegetable', kcal: 25, protein: 2.8, carbs: 4.1, fat: 0.3 },
 
   // ---------- 水果 ----------
-  { id: 'f_apple', name: '苹果', category: 'fruit', kcal: 53, protein: 0.2, carbs: 13.7, fat: 0.2 },
-  { id: 'f_banana', name: '香蕉', category: 'fruit', kcal: 93, protein: 1.4, carbs: 22.0, fat: 0.2 },
-  { id: 'f_orange', name: '橙子', category: 'fruit', kcal: 48, protein: 0.8, carbs: 11.1, fat: 0.2 },
+  { id: 'f_apple', name: '苹果', category: 'fruit', kcal: 53, protein: 0.2, carbs: 13.7, fat: 0.2, unit: '个', unitGrams: 200 },
+  { id: 'f_banana', name: '香蕉', category: 'fruit', kcal: 93, protein: 1.4, carbs: 22.0, fat: 0.2, unit: '根', unitGrams: 120 },
+  { id: 'f_orange', name: '橙子', category: 'fruit', kcal: 48, protein: 0.8, carbs: 11.1, fat: 0.2, unit: '个', unitGrams: 200 },
   { id: 'f_blueberry', name: '蓝莓', category: 'fruit', kcal: 57, protein: 0.7, carbs: 14.5, fat: 0.3 },
   { id: 'f_strawberry', name: '草莓', category: 'fruit', kcal: 32, protein: 1.0, carbs: 7.1, fat: 0.2 },
-  { id: 'f_kiwi', name: '猕猴桃', category: 'fruit', kcal: 61, protein: 0.8, carbs: 14.5, fat: 0.6 },
+  { id: 'f_kiwi', name: '猕猴桃', category: 'fruit', kcal: 61, protein: 0.8, carbs: 14.5, fat: 0.6, unit: '个', unitGrams: 80 },
   { id: 'f_grape', name: '葡萄', category: 'fruit', kcal: 45, protein: 0.4, carbs: 10.3, fat: 0.3 },
-  { id: 'f_pear', name: '梨', category: 'fruit', kcal: 51, protein: 0.4, carbs: 13.3, fat: 0.2 },
-  { id: 'f_peach', name: '桃', category: 'fruit', kcal: 48, protein: 0.9, carbs: 12.2, fat: 0.1 },
+  { id: 'f_pear', name: '梨', category: 'fruit', kcal: 51, protein: 0.4, carbs: 13.3, fat: 0.2, unit: '个', unitGrams: 200 },
+  { id: 'f_peach', name: '桃', category: 'fruit', kcal: 48, protein: 0.9, carbs: 12.2, fat: 0.1, unit: '个', unitGrams: 200 },
   { id: 'f_cherry_tomato', name: '圣女果', category: 'fruit', kcal: 22, protein: 1.0, carbs: 5.8, fat: 0.2 },
   { id: 'f_pomelo', name: '柚子', category: 'fruit', kcal: 42, protein: 0.8, carbs: 9.5, fat: 0.2 },
   { id: 'f_watermelon', name: '西瓜', category: 'fruit', kcal: 26, protein: 0.6, carbs: 5.8, fat: 0.1 },
@@ -164,11 +165,11 @@ const RAW_FOODS = [
   { id: 'f_dragon_fruit', name: '火龙果', category: 'fruit', kcal: 55, protein: 1.1, carbs: 13.3, fat: 0.2 },
   { id: 'f_lychee', name: '荔枝', category: 'fruit', kcal: 71, protein: 0.9, carbs: 16.6, fat: 0.2 },
   { id: 'f_avocado', name: '牛油果', category: 'fruit', kcal: 160, protein: 2.0, carbs: 7.4, fat: 15.3 },
-  { id: 'f_mango', name: '芒果', category: 'fruit', kcal: 35, protein: 0.8, carbs: 8.3, fat: 0.2 },
+  { id: 'f_mango', name: '芒果', category: 'fruit', kcal: 35, protein: 0.8, carbs: 8.3, fat: 0.2, unit: '个', unitGrams: 200 },
   { id: 'f_papaya', name: '木瓜', category: 'fruit', kcal: 29, protein: 0.4, carbs: 7.0, fat: 0.1 },
-  { id: 'f_persimmon', name: '柿子', category: 'fruit', kcal: 71, protein: 0.4, carbs: 18.5, fat: 0.1 },
-  { id: 'f_mandarin', name: '橘子', category: 'fruit', kcal: 44, protein: 0.8, carbs: 10.2, fat: 0.1 },
-  { id: 'f_pomegranate', name: '石榴', category: 'fruit', kcal: 72, protein: 1.4, carbs: 18.7, fat: 0.2 },
+  { id: 'f_persimmon', name: '柿子', category: 'fruit', kcal: 71, protein: 0.4, carbs: 18.5, fat: 0.1, unit: '个', unitGrams: 150 },
+  { id: 'f_mandarin', name: '橘子', category: 'fruit', kcal: 44, protein: 0.8, carbs: 10.2, fat: 0.1, unit: '个', unitGrams: 80 },
+  { id: 'f_pomegranate', name: '石榴', category: 'fruit', kcal: 72, protein: 1.4, carbs: 18.7, fat: 0.2, unit: '个', unitGrams: 200 },
 
   // ---------- 油脂坚果 ----------
   { id: 'f_olive_oil', name: '橄榄油', category: 'oil_nuts', kcal: 899, protein: 0, carbs: 0, fat: 99.9 },
@@ -215,3 +216,14 @@ const ANTI_INFLAMMATORY_IDS = new Set([
 export const FOODS = RAW_FOODS.map((f) => ({ ...f, antiInfl: ANTI_INFLAMMATORY_IDS.has(f.id) }))
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
+
+/** 生活化显示:有单位的食材显示"3个(150g)",否则"150g" */
+export function formatFoodAmount(food, grams) {
+  const g = Math.round(grams)
+  if (food?.unit && food?.unitGrams > 0) {
+    const n = grams / food.unitGrams
+    const count = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10)
+    return `${count}${food.unit}(${g}g)`
+  }
+  return `${g}g`
+}
