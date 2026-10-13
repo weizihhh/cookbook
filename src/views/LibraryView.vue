@@ -469,7 +469,7 @@ async function removeCustom() {
 }
 .unit-hint {
   font-size: 11px;
-  color: #1989fa;
+  color: var(--cb-primary);
 }
 .detail {
   padding: 16px;
@@ -521,12 +521,12 @@ async function removeCustom() {
 }
 .ocr-hint {
   font-size: 12px;
-  color: #1989fa;
+  color: var(--cb-primary);
 }
 .photo-preview {
   max-width: 100%;
   max-height: 160px;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 8px;
 }
 .field-unit {

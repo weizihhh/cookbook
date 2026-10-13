@@ -728,7 +728,7 @@ function ingredientText(item) {
   color: #c8c9cc;
 }
 .metric-status.ok {
-  color: #07c160;
+  color: var(--cb-primary);
 }
 .metric-status.over {
   color: #ee0a24;
@@ -746,7 +746,7 @@ function ingredientText(item) {
   font-weight: normal;
 }
 .weight-change.ok {
-  color: #07c160;
+  color: var(--cb-primary);
 }
 .weight-change.over {
   color: #ff976a;
@@ -922,7 +922,7 @@ function ingredientText(item) {
 }
 .unit-hint {
   font-size: 11px;
-  color: #1989fa;
+  color: var(--cb-primary);
 }
 .detail {
   padding: 16px;

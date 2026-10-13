@@ -257,6 +257,20 @@ function gramsToJin(g) {
   align-items: center;
   padding: 4px 0;
 }
+/* 折叠面板改为独立圆角卡片,与全应用卡片风一致 */
+.page :deep(.van-collapse) {
+  background: transparent;
+}
+.page :deep(.van-collapse-item) {
+  margin-bottom: 12px;
+  background: #fff;
+  border-radius: var(--cb-card-radius);
+  box-shadow: 0 1px 4px rgba(31, 45, 39, 0.05);
+  overflow: hidden;
+}
+.page :deep(.van-collapse-item::after) {
+  display: none;
+}
 .week-range {
   font-size: 12px;
   color: #969799;
@@ -278,7 +292,7 @@ function gramsToJin(g) {
   gap: 6px;
 }
 .day-title.today {
-  color: #1989fa;
+  color: var(--cb-primary);
   font-weight: 600;
 }
 .day-right {
@@ -312,7 +326,7 @@ function gramsToJin(g) {
   font-size: 11px;
 }
 .checkin-mark.done {
-  color: #07c160;
+  color: var(--cb-primary);
 }
 .checkin-mark.skip {
   color: #969799;
@@ -332,7 +346,7 @@ function gramsToJin(g) {
   margin-right: 8px;
 }
 .swap-icon {
-  color: #1989fa;
+  color: var(--cb-primary);
   font-size: 15px;
   vertical-align: middle;
 }
@@ -374,6 +388,6 @@ function gramsToJin(g) {
 }
 .unit-line {
   font-size: 11px;
-  color: #1989fa;
+  color: var(--cb-primary);
 }
 </style>

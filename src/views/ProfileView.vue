@@ -408,7 +408,7 @@ async function doReset() {
   line-height: 1.7;
 }
 .chg-down {
-  color: #07c160;
+  color: var(--cb-primary);
   font-size: 11px;
 }
 .chg-up {
@@ -421,7 +421,7 @@ async function doReset() {
   padding: 4px 2px;
 }
 :deep(.em) {
-  color: #1989fa;
+  color: var(--cb-primary);
   font-weight: 600;
 }
 </style>
