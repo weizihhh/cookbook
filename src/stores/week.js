@@ -3,17 +3,18 @@ import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
 import { generateDayPlan, generateWeekPlan, swapSlotItem, addItemToMeal, summarizeDay } from '../core/planner'
 import { useProfileStore } from './profile'
-import { loadState, saveState } from '../utils/storage'
+import { loadState, saveState, removeState } from '../utils/storage'
 import { todayStr, weekStartOf, addDays } from '../utils/date'
 
 const KEY = 'week'
 
-/** 读取并迁移 v0.1 的单日 plan 数据到周结构 */
+/** 读取并迁移 v0.1 的单日 plan 数据到周结构(迁移后清除旧 key,避免重复迁移) */
 function initState() {
   const saved = loadState(KEY, null)
   if (saved?.days) return saved
   const oldPlan = loadState('plan', null)
   if (oldPlan?.meals && oldPlan.date) {
+    removeState('plan')
     return { weekStart: weekStartOf(oldPlan.date), days: { [oldPlan.date]: oldPlan.meals } }
   }
   return { weekStart: weekStartOf(todayStr()), days: {} }

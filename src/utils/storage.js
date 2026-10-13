@@ -20,6 +20,14 @@ export function saveState(key, value) {
   }
 }
 
+export function removeState(key) {
+  try {
+    localStorage.removeItem(PREFIX + key)
+  } catch {
+    /* 忽略 */
+  }
+}
+
 /** 导出全部数据为 JSON 文件下载 */
 export function exportAll(data, filename = 'cookbook-backup.json') {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })

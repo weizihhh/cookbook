@@ -22,6 +22,10 @@ export const SLOT_LABELS = {
 
 const S_MIN = 0.3
 const S_MAX = 3
+// 无小单位食材的绝对克数边界:防低热量目标压到"12g 红豆"、高目标撑到"660g 山药"
+// (油盐等 scalable=false 的固定佐料不受此限)
+const GRAMS_MIN = 20
+const GRAMS_MAX = 500
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 const r1 = (v) => Math.round(v * 10) / 10
@@ -80,11 +84,18 @@ export function scaleRecipe(recipe, foods, { byProtein = null, byKcal = null, ma
   }
   s = clamp(s, S_MIN, S_MAX)
 
-  const ingredients = recipe.ingredients.map((ing) => ({
-    foodId: ing.foodId,
-    grams: Math.round(ing.scalable ? ing.grams * s : ing.grams),
-    scalable: ing.scalable,
-  }))
+  const ingredients = recipe.ingredients.map((ing) => {
+    if (!ing.scalable) return { ...ing }
+    const f = foods[ing.foodId]
+    let grams = ing.grams * s
+    if (f?.unit && f.unitGrams > 0 && f.unitGrams < 100) {
+      // 小单位食材(<100g/个)吸附到整数倍,避免"3.5个鸡蛋"这类不可操作用量
+      grams = Math.max(f.unitGrams, Math.round(grams / f.unitGrams) * f.unitGrams)
+    } else {
+      grams = clamp(grams, GRAMS_MIN, GRAMS_MAX)
+    }
+    return { foodId: ing.foodId, grams: Math.round(grams), scalable: ing.scalable }
+  })
   return { recipeId: recipe.id, slot: recipe.slot, ingredients, scale: r1(s) }
 }
 

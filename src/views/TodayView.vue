@@ -62,6 +62,7 @@
             track-color="#ebedf0"
             style="margin-top: 10px"
           />
+          <div v-if="hasSkippedMeal" class="skip-note">已跳过的餐次不计入上方合计</div>
         </div>
       </van-cell-group>
 
@@ -255,6 +256,9 @@
                 <template #title>
                   {{ r.name }}
                   <van-tag v-if="r.antiInfl" color="#07c160" size="medium" style="margin-left: 4px">抗炎</van-tag>
+                  <van-tag v-if="addSearch.trim() && !r.mealFit.includes(addMealKey)" color="#c8c9cc" size="medium" style="margin-left: 4px">
+                    非{{ addMealLabel }}
+                  </van-tag>
                 </template>
                 <template #value>
                   <span class="add-kcal">{{ baseKcal(r) }} 千卡/基准份</span>
@@ -363,23 +367,23 @@ const modeLabel = computed(
 const todayMeals = computed(() => week.mealsOf(today))
 const summary = computed(() => (todayMeals.value ? week.summaryOf(today) : null))
 
-const totals = computed(() =>
-  summary.value ? summary.value.totals : { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-)
 const kcalPercentage = computed(() =>
   targets.value.kcal > 0
     ? Math.min(100, Math.round((totals.value.kcal / targets.value.kcal) * 100))
     : 0
 )
+const allSkipped = computed(() => MEALS.every((m) => mealActuals.value[m.key]?.skipped))
 const deviationClass = computed(() => {
   if (!summary.value) return 'ok'
-  const d = summary.value.diff.kcal
+  if (allSkipped.value) return 'ok'
+  const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return 'ok'
   return d > 0 ? 'over' : 'under'
 })
 const deviationText = computed(() => {
   if (!summary.value) return '待生成'
-  const d = summary.value.diff.kcal
+  if (allSkipped.value) return '今日未进食'
+  const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return '达标 ✓'
   return d > 0 ? `热量超 ${d}%` : `热量低 ${-d}%`
 })
@@ -388,7 +392,7 @@ const mealTargets = computed(() =>
   Object.fromEntries(targets.value.meals.map((m) => [m.key, m]))
 )
 
-// 每餐实际合计(随添加/移除/改克数实时变化)
+// 每餐实际合计(随添加/移除/改克数实时变化);skipped 标记该餐是否被打卡跳过
 const mealActuals = computed(() => {
   const out = {}
   for (const m of MEALS) {
@@ -400,10 +404,37 @@ const mealActuals = computed(() => {
       total.kcal += n.kcal
       total.protein += n.protein
     }
-    out[m.key] = { kcal: Math.round(total.kcal), protein: Math.round(total.protein) }
+    out[m.key] = {
+      kcal: Math.round(total.kcal),
+      protein: Math.round(total.protein),
+      skipped: checkin.statusOf(today, m.key) === 'skip',
+    }
   }
   return out
 })
+
+// 顶部合计按"已吃"口径:跳过的餐次不计入(打卡 skip 表示没吃这餐)
+const totals = computed(() => {
+  if (!todayMeals.value) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  const out = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  for (const m of MEALS) {
+    if (mealActuals.value[m.key].skipped) continue
+    for (const it of todayMeals.value[m.key] || []) {
+      if (!it) continue
+      const n = computeNutrition(it.ingredients, FOODS_MAP)
+      out.kcal += n.kcal
+      out.protein += n.protein
+      out.carbs += n.carbs
+      out.fat += n.fat
+    }
+  }
+  out.kcal = Math.round(out.kcal)
+  out.protein = Math.round(out.protein)
+  out.carbs = Math.round(out.carbs * 10) / 10
+  out.fat = Math.round(out.fat * 10) / 10
+  return out
+})
+const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]?.skipped))
 
 function generate() {
   week.generateDay(today)
@@ -528,6 +559,9 @@ function openAdd(mealKey) {
   addShow.value = true
 }
 
+// 搜索会放开到全库,对不属于当前餐次的候选加"非早/午/晚餐"标记
+const addMealLabel = computed(() => MEALS.find((m) => m.key === addMealKey.value)?.label || '')
+
 function filteredAddRecipes(slot) {
   const kw = addSearch.value.trim()
   // 默认只列适合该餐次的食谱;有关键词时放开到全库搜索
@@ -617,6 +651,11 @@ function ingredientText(item) {
 }
 .deviation.under {
   color: #ff976a;
+}
+.skip-note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #969799;
 }
 .weight-change {
   font-size: 12px;

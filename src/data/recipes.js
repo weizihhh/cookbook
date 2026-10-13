@@ -278,7 +278,7 @@ const RAW_RECIPES = [
     steps: ['1个鸡蛋加3个蛋白打散', '少油小火煎成蛋卷,可卷入蔬菜碎'],
   },
   {
-    id: 'r_chickpea_salad', name: '凉拌鹰嘴豆', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
+    id: 'r_chickpea_salad', name: '凉拌鹰嘴豆', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: ['soy'],
     ingredients: [
       { foodId: 'f_chickpea_cooked', grams: 180, scalable: true },
       { foodId: 'f_olive_oil', grams: 3, scalable: false },
@@ -335,7 +335,7 @@ const RAW_RECIPES = [
     steps: ['瘦肉切片腌10分钟', '少油大火快炒,加少许青椒同炒更香'],
   },
   {
-    id: 'r_lamb_stew', name: '清炖羊肉', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: [],
+    id: 'r_lamb_stew', name: '清炖羊肉', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['lamb'],
     ingredients: [{ foodId: 'f_lamb_lean', grams: 130, scalable: true }],
     steps: ['羊肉焯水去浮沫', '加姜片、葱段、白萝卜块,小火炖50分钟,出锅撒盐'],
   },
@@ -484,7 +484,7 @@ const RAW_RECIPES = [
     steps: ['蛤蜊吐沙焯水取肉', '鸡蛋打散加1.2倍温水,放入蛤蜊肉蒸10分钟'],
   },
   {
-    id: 'r_lamb_scallion', name: '葱爆羊肉', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: [],
+    id: 'r_lamb_scallion', name: '葱爆羊肉', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['lamb'],
     ingredients: [
       { foodId: 'f_lamb_lean', grams: 130, scalable: true },
       { foodId: 'f_olive_oil', grams: 6, scalable: false },

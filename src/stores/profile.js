@@ -11,9 +11,9 @@ const defaults = () => ({
   weight: 70,
   activity: 1.375,
   mode: 'cut',
-  macroPreset: 'custom', // 见 nutrition.js 的 MACRO_PRESETS
+  macroPreset: 'cut', // 与 MODE_PRESET.cut 一致:新用户首屏即减脂推荐值
   manualKcal: null, // 手动覆盖目标热量,null 表示按公式算
-  proteinPerKg: 1.8,
+  proteinPerKg: 2.0,
   fatRatio: 0.25,
   mealSplit: [0.3, 0.4, 0.3],
   excludedTags: [],

@@ -23,7 +23,7 @@
 
     <van-empty v-if="!hasAny" image="normal" description="还没有本周计划,点击上方生成" />
 
-    <van-collapse v-model:active="activeDays" v-else>
+    <van-collapse v-model="activeDays" v-else>
       <van-collapse-item
         v-for="date in week.weekDates"
         :key="date"
@@ -245,6 +245,7 @@ function gramsToJin(g) {
     const jin = Math.round(g / 50) / 10
     return `${jin}斤`
   }
+  if (g < 25) return '不足半两'
   return `${Math.max(1, Math.round(g / 50))}两`
 }
 </script>

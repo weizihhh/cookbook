@@ -146,7 +146,7 @@
     </van-cell-group>
 
     <div style="margin: 16px 0">
-      <van-button round block type="primary" @click="save">保存设置</van-button>
+      <van-button round block type="primary" @click="save()">保存设置</van-button>
     </div>
 
     <van-cell-group inset title="体重记录">
@@ -169,7 +169,7 @@
     </van-cell-group>
 
     <van-cell-group inset title="营养小贴士">
-      <van-collapse v-model:active="activeTips">
+      <van-collapse v-model="activeTips">
         <van-collapse-item v-for="t in TIPS" :key="t.id" :title="t.title" :name="t.id">
           <div class="tip-text">{{ t.body }}</div>
         </van-collapse-item>
@@ -208,7 +208,7 @@ import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useWeightStore } from '../stores/weight'
 import { useCheckinStore } from '../stores/checkin'
-import { exportAll, importFile } from '../utils/storage'
+import { exportAll, importFile, removeState } from '../utils/storage'
 import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
@@ -352,9 +352,9 @@ function mealLabel(key) {
   return MEALS.find((m) => m.key === key)?.label || key
 }
 
-function save() {
+function save(silent = false) {
   if (!form.age || !form.height || !form.weight) {
-    showToast('请先填完年龄、身高、体重')
+    if (!silent) showToast('请先填完年龄、身高、体重')
     return
   }
   profile.update({
@@ -362,8 +362,17 @@ function save() {
     mealSplit: normalizeSplit(),
     manualKcal: manualKcalInput.value ? Number(manualKcalInput.value) : null,
   })
-  showToast('已保存')
+  if (!silent) showToast('已保存')
 }
+
+// 自动保存:任何调整(滑块/模式/排除项等)静默持久化,切页不再丢失;
+// "保存设置"按钮保留,作为带反馈的显式确认入口
+watch(
+  () => [JSON.stringify({ ...form }), manualKcalInput.value, splitInputs.value.join(',')],
+  () => {
+    if (form.age && form.height && form.weight) save(true)
+  }
+)
 
 // ---- 数据管理 ----
 const fileInput = ref(null)
@@ -419,6 +428,7 @@ async function doReset() {
   plan.clearAll()
   checkin.clear()
   weight.clear()
+  removeState('plan') // v0.1 遗留的单日 plan key,防止日后经迁移逻辑"复活"
   window.location.reload()
 }
 </script>

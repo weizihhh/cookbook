@@ -53,6 +53,7 @@ export const EXCLUDE_TAGS = [
   { value: 'chicken', label: '鸡肉' },
   { value: 'duck', label: '鸭肉' },
   { value: 'rabbit', label: '兔肉' },
+  { value: 'lamb', label: '羊肉' },
   { value: 'seafood', label: '海鲜/鱼虾' },
   { value: 'egg', label: '蛋' },
   { value: 'milk', label: '奶制品' },

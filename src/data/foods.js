@@ -217,12 +217,16 @@ export const FOODS = RAW_FOODS.map((f) => ({ ...f, antiInfl: ANTI_INFLAMMATORY_I
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
 
-/** 生活化显示:有单位的食材显示"3个(150g)",否则"150g" */
+/** 生活化显示:有单位的食材显示"3个(150g)",否则"150g"
+ *  小单位(<100g/个)取整(生成端已吸附到整数倍);大单位保留 1 位小数(整数倍跳跃过大) */
 export function formatFoodAmount(food, grams) {
   const g = Math.round(grams)
   if (food?.unit && food?.unitGrams > 0) {
     const n = grams / food.unitGrams
-    const count = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10)
+    const count =
+      food.unitGrams < 100
+        ? String(Math.max(1, Math.round(n)))
+        : String(Math.round(n * 10) / 10)
     return `${count}${food.unit}(${g}g)`
   }
   return `${g}g`
