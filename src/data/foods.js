@@ -36,6 +36,11 @@ export const FOODS = [
   { id: 'f_black_glutinous_rice', name: '紫米(生)', category: 'grain', kcal: 345, protein: 8.3, carbs: 75.0, fat: 1.7 },
   { id: 'f_mung_bean_dry', name: '绿豆(干)', category: 'grain', kcal: 329, protein: 21.6, carbs: 62.0, fat: 0.8 },
   { id: 'f_red_bean_dry', name: '红豆(干)', category: 'grain', kcal: 324, protein: 20.2, carbs: 63.4, fat: 0.6 },
+  { id: 'f_taro', name: '芋头', category: 'grain', kcal: 81, protein: 2.2, carbs: 18.1, fat: 0.2 },
+  { id: 'f_sorghum', name: '高粱米(生)', category: 'grain', kcal: 351, protein: 10.4, carbs: 74.7, fat: 3.1 },
+  { id: 'f_cornmeal', name: '玉米面', category: 'grain', kcal: 350, protein: 8.1, carbs: 73.0, fat: 3.3 },
+  { id: 'f_noodles_dry', name: '挂面(干)', category: 'grain', kcal: 348, protein: 10.3, carbs: 74.5, fat: 0.6 },
+  { id: 'f_glutinous_rice', name: '糯米(生)', category: 'grain', kcal: 350, protein: 7.3, carbs: 78.3, fat: 0.8 },
 
   // ---------- 畜禽肉 ----------
   { id: 'f_chicken_breast', name: '鸡胸肉', category: 'meat', kcal: 133, protein: 22.0, carbs: 0, fat: 5.0 },
@@ -51,6 +56,8 @@ export const FOODS = [
   { id: 'f_chicken_liver', name: '鸡肝', category: 'meat', kcal: 121, protein: 16.6, carbs: 2.8, fat: 4.8 },
   { id: 'f_beef_brisket', name: '牛腩', category: 'meat', kcal: 332, protein: 17.0, carbs: 0.1, fat: 24.0 },
   { id: 'f_pork_ribs', name: '猪肋排', category: 'meat', kcal: 270, protein: 17.0, carbs: 0.7, fat: 21.0 },
+  { id: 'f_beef_tenderloin', name: '牛里脊', category: 'meat', kcal: 113, protein: 22.0, carbs: 1.0, fat: 3.0 },
+  { id: 'f_rabbit', name: '兔肉', category: 'meat', kcal: 102, protein: 19.7, carbs: 0.9, fat: 2.2 },
 
   // ---------- 鱼虾海鲜 ----------
   { id: 'f_salmon', name: '三文鱼', category: 'seafood', kcal: 180, protein: 20.0, carbs: 0, fat: 10.0 },
@@ -66,6 +73,8 @@ export const FOODS = [
   { id: 'f_razor_clam', name: '蛏子', category: 'seafood', kcal: 40, protein: 7.3, carbs: 2.1, fat: 0.3 },
   { id: 'f_oyster', name: '生蚝', category: 'seafood', kcal: 73, protein: 5.3, carbs: 8.2, fat: 2.1 },
   { id: 'f_crucian', name: '鲫鱼', category: 'seafood', kcal: 108, protein: 17.1, carbs: 3.8, fat: 2.7 },
+  { id: 'f_scallop', name: '扇贝', category: 'seafood', kcal: 60, protein: 11.1, carbs: 2.6, fat: 0.6 },
+  { id: 'f_pomfret', name: '鲳鱼', category: 'seafood', kcal: 140, protein: 18.5, carbs: 0, fat: 7.0 },
 
   // ---------- 蛋奶豆制品 ----------
   { id: 'f_egg', name: '鸡蛋', category: 'egg_dairy_soy', kcal: 144, protein: 13.3, carbs: 2.8, fat: 8.8 },
@@ -84,6 +93,8 @@ export const FOODS = [
   { id: 'f_quail_egg', name: '鹌鹑蛋', category: 'egg_dairy_soy', kcal: 160, protein: 12.8, carbs: 2.1, fat: 11.1 },
   { id: 'f_tofu_sheet', name: '千张', category: 'egg_dairy_soy', kcal: 260, protein: 24.0, carbs: 5.0, fat: 16.0 },
   { id: 'f_black_bean_dry', name: '黑豆(干)', category: 'egg_dairy_soy', kcal: 381, protein: 36.0, carbs: 33.0, fat: 16.0 },
+  { id: 'f_cottage_cheese', name: '茅屋奶酪', category: 'egg_dairy_soy', kcal: 80, protein: 12.0, carbs: 3.0, fat: 2.0 },
+  { id: 'f_vegetarian_chicken', name: '素鸡', category: 'egg_dairy_soy', kcal: 192, protein: 16.5, carbs: 4.2, fat: 12.5 },
 
   // ---------- 蔬菜菌菇 ----------
   { id: 'f_broccoli', name: '西兰花', category: 'vegetable', kcal: 36, protein: 4.1, carbs: 4.3, fat: 0.6 },
@@ -124,6 +135,14 @@ export const FOODS = [
   { id: 'f_bitter_melon', name: '苦瓜', category: 'vegetable', kcal: 22, protein: 1.0, carbs: 4.9, fat: 0.1 },
   { id: 'f_water_bamboo', name: '茭白', category: 'vegetable', kcal: 26, protein: 1.2, carbs: 5.9, fat: 0.2 },
   { id: 'f_konjac', name: '魔芋结', category: 'vegetable', kcal: 8, protein: 0.2, carbs: 2.5, fat: 0.1 },
+  { id: 'f_bok_choy', name: '小油菜', category: 'vegetable', kcal: 15, protein: 1.5, carbs: 2.7, fat: 0.3 },
+  { id: 'f_celtuce', name: '莴笋', category: 'vegetable', kcal: 15, protein: 1.0, carbs: 2.8, fat: 0.1 },
+  { id: 'f_garlic_sprout', name: '蒜薹', category: 'vegetable', kcal: 61, protein: 2.0, carbs: 8.0, fat: 0.1 },
+  { id: 'f_snow_pea', name: '荷兰豆', category: 'vegetable', kcal: 30, protein: 2.5, carbs: 4.9, fat: 0.3 },
+  { id: 'f_onion', name: '洋葱', category: 'vegetable', kcal: 40, protein: 1.1, carbs: 9.0, fat: 0.2 },
+  { id: 'f_green_pepper', name: '青椒', category: 'vegetable', kcal: 23, protein: 1.4, carbs: 5.4, fat: 0.3 },
+  { id: 'f_soybean_sprout', name: '黄豆芽', category: 'vegetable', kcal: 46, protein: 4.5, carbs: 4.5, fat: 1.6 },
+  { id: 'f_amaranth', name: '苋菜', category: 'vegetable', kcal: 25, protein: 2.8, carbs: 4.1, fat: 0.3 },
 
   // ---------- 水果 ----------
   { id: 'f_apple', name: '苹果', category: 'fruit', kcal: 53, protein: 0.2, carbs: 13.7, fat: 0.2 },
@@ -145,6 +164,11 @@ export const FOODS = [
   { id: 'f_dragon_fruit', name: '火龙果', category: 'fruit', kcal: 55, protein: 1.1, carbs: 13.3, fat: 0.2 },
   { id: 'f_lychee', name: '荔枝', category: 'fruit', kcal: 71, protein: 0.9, carbs: 16.6, fat: 0.2 },
   { id: 'f_avocado', name: '牛油果', category: 'fruit', kcal: 160, protein: 2.0, carbs: 7.4, fat: 15.3 },
+  { id: 'f_mango', name: '芒果', category: 'fruit', kcal: 35, protein: 0.8, carbs: 8.3, fat: 0.2 },
+  { id: 'f_papaya', name: '木瓜', category: 'fruit', kcal: 29, protein: 0.4, carbs: 7.0, fat: 0.1 },
+  { id: 'f_persimmon', name: '柿子', category: 'fruit', kcal: 71, protein: 0.4, carbs: 18.5, fat: 0.1 },
+  { id: 'f_mandarin', name: '橘子', category: 'fruit', kcal: 44, protein: 0.8, carbs: 10.2, fat: 0.1 },
+  { id: 'f_pomegranate', name: '石榴', category: 'fruit', kcal: 72, protein: 1.4, carbs: 18.7, fat: 0.2 },
 
   // ---------- 油脂坚果 ----------
   { id: 'f_olive_oil', name: '橄榄油', category: 'oil_nuts', kcal: 899, protein: 0, carbs: 0, fat: 99.9 },
@@ -156,6 +180,7 @@ export const FOODS = [
   { id: 'f_cashew', name: '腰果', category: 'oil_nuts', kcal: 559, protein: 17.0, carbs: 42.0, fat: 37.0 },
   { id: 'f_black_sesame', name: '黑芝麻', category: 'oil_nuts', kcal: 531, protein: 19.0, carbs: 24.0, fat: 46.0 },
   { id: 'f_pistachio', name: '开心果', category: 'oil_nuts', kcal: 562, protein: 20.0, carbs: 21.0, fat: 45.0 },
+  { id: 'f_pumpkin_seed', name: '南瓜子仁', category: 'oil_nuts', kcal: 574, protein: 33.0, carbs: 10.0, fat: 49.0 },
 ]
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
