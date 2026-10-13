@@ -36,7 +36,7 @@ check('蛋白 1.8g/kg', Math.abs(t.protein - 126) < 0.01, `got ${t.protein}`)
 // 脂肪 = 1882*0.25/9 = 52.3;碳水 = (1882-126*4-52.3*9)/4 ≈ 227
 check('脂肪 25% 热量占比', Math.abs(t.fat - 52.3) < 0.5, `got ${t.fat}`)
 check('碳水补齐', Math.abs(t.carbs - 227) < 2, `got ${t.carbs}`)
-check('三餐分配 30/40/30', Math.abs(t.meals[1].kcal - t.kcal * 0.4) < 1)
+check('三餐分配 25/45/30', Math.abs(t.meals[1].kcal - t.kcal * 0.45) < 1)
 
 // 女性公式:BMR = 10W+6.25H-5A-161
 const t2 = calcTargets({ gender: 'female', age: 30, height: 162, weight: 55, activity: 1.2, mode: 'maintain' })

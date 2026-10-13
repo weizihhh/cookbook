@@ -92,7 +92,7 @@
               :fill="i === trendPoints.length - 1 ? '#1989fa' : '#c8c9cc'"
             />
           </svg>
-          <span v-else class="trend-empty">记录两周以上可看趋势</span>
+          <span v-else class="trend-empty">记录 2 次起显示趋势折线</span>
         </div>
       </van-cell-group>
 

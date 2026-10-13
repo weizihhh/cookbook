@@ -15,7 +15,7 @@ const defaults = () => ({
   manualKcal: null, // 手动覆盖目标热量,null 表示按公式算
   proteinPerKg: 2.0,
   fatRatio: 0.25,
-  mealSplit: [0.3, 0.4, 0.3],
+  mealSplit: [0.25, 0.45, 0.3],
   excludedTags: [],
   configured: false, // 是否完成过首次设置
 })

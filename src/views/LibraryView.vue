@@ -1,5 +1,10 @@
 <template>
   <div class="page">
+    <van-search
+      v-model="searchKw"
+      class="library-search"
+      placeholder="搜索食谱或食材,如:鸡胸、豆腐"
+    />
     <van-tabs v-model:active="activeTab" sticky>
       <van-tab v-for="s in slots" :key="s.value" :title="s.label">
         <van-cell-group inset style="margin-top: 10px">
@@ -12,6 +17,8 @@
             <template #title>
               {{ r.name }}
               <span class="fit">{{ fitText(r) }}</span>
+              <van-tag v-if="r.custom" plain type="primary" size="medium" style="margin-left: 4px">{{ r.source || '自定义' }}</van-tag>
+              <van-tag v-if="searchKw.trim() && s.value !== 'all' && r.slot !== s.value" color="#c8c9cc" size="medium" style="margin-left: 4px">{{ SLOT_LABELS[r.slot] || r.slot }}</van-tag>
               <van-tag v-if="r.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 4px">抗炎</van-tag>
             </template>
             <template #label>
@@ -34,15 +41,16 @@
         </van-cell-group>
       </van-tab>
       <van-tab title="食材库">
+        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪,每 100g 含量(g)</div>
         <van-cell-group
-          v-for="cat in FOOD_CATEGORIES"
-          :key="cat.value"
+          v-for="g in foodGroups"
+          :key="g.value"
           inset
-          :title="cat.label"
+          :title="g.label"
           style="margin-top: 10px"
         >
           <van-cell
-            v-for="f in foodsOf(cat.value)"
+            v-for="f in g.foods"
             :key="f.id"
             :title="f.name"
           >
@@ -57,8 +65,10 @@
             </template>
           </van-cell>
         </van-cell-group>
+        <van-empty v-if="!foodGroups.length" image-size="60" description="没有匹配的食材" />
       </van-tab>
       <van-tab :title="`自定义${customFoods.foods.length ? '(' + customFoods.foods.length + ')' : ''}`">
+        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪,每 100g 含量(g)</div>
         <div class="custom-actions">
           <van-button size="small" type="primary" @click="openImport">📷 拍照导入</van-button>
           <van-button size="small" type="primary" plain @click="openImport">手动添加</van-button>
@@ -98,7 +108,7 @@
           <van-empty
             v-if="!customFoodsFiltered.length"
             image-size="60"
-            description="还没有自定义食物,拍照识别包装上的营养成分表试试"
+            :description="searchKw.trim() ? '没有匹配的自定义食物' : '还没有自定义食物,拍照识别包装上的营养成分表试试'"
           />
         </van-cell-group>
       </van-tab>
@@ -124,12 +134,14 @@
           :title="FOODS_MAP[ing.foodId]?.name + (ing.scalable ? '(可缩放)' : '')"
           :value="ing.grams + 'g'"
         />
-        <van-cell title="做法" />
-        <div class="steps">
-          <ol>
-            <li v-for="(s, i) in current.steps" :key="i">{{ s }}</li>
-          </ol>
-        </div>
+        <template v-if="current.steps?.length">
+          <van-cell title="做法" />
+          <div class="steps">
+            <ol>
+              <li v-for="(s, i) in current.steps" :key="i">{{ s }}</li>
+            </ol>
+          </div>
+        </template>
         <div class="hint">
           抗炎标注参照抗炎饮食研究共识(如膳食炎症指数 DII)近似归类,属生活方式参考,不作医疗建议。
           加入今日计划时会按你的目标热量自动调整可缩放食材的克数。
@@ -223,7 +235,7 @@ import { ref, reactive, computed } from 'vue'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
 import { RECIPES } from '../data/recipes'
 import { FOODS, FOODS_MAP, FOOD_CATEGORIES } from '../data/foods'
-import { computeNutrition } from '../core/planner'
+import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { EXCLUDE_TAGS } from '../core/nutrition'
 import { parseNutritionLabel, normalizeTo100g } from '../core/labelScan'
 import { scanImageText } from '../utils/ocr'
@@ -239,15 +251,31 @@ const slots = [
   { value: 'anti', label: '抗炎' },
 ]
 const activeTab = ref(0)
+const searchKw = ref('')
 
+// 搜索时放开槽位筛选,全库(含自定义食物)按名称匹配
 function recipesOf(slot) {
+  const kw = searchKw.value.trim()
+  if (kw) return allLibraryRecipes.value.filter((r) => r.name.includes(kw))
   if (slot === 'all') return RECIPES
   if (slot === 'anti') return RECIPES.filter((r) => r.antiInfl)
   return RECIPES.filter((r) => r.slot === slot)
 }
-function foodsOf(cat) {
-  return FOODS.filter((f) => f.category === cat)
-}
+
+// 食材分组:无关键词按类目分组,有关键词时跨类目合并为一组
+const foodGroups = computed(() => {
+  const kw = searchKw.value.trim()
+  if (kw) {
+    const matched = FOODS.filter((f) => f.name.includes(kw))
+    return matched.length
+      ? [{ value: '__search__', label: `"${kw}" · ${matched.length} 个食材`, foods: matched }]
+      : []
+  }
+  return FOOD_CATEGORIES.map((c) => ({
+    ...c,
+    foods: FOODS.filter((f) => f.category === c.value),
+  }))
+})
 function baseNutrition(recipe) {
   return computeNutrition(recipe.ingredients, FOODS_MAP)
 }
@@ -272,11 +300,15 @@ const week = useWeekStore()
 customFoods.sync() // 注册进运行时 FOODS_MAP/RECIPES_MAP,供全应用按 id 查询
 
 const filterSource = ref('全部')
-const customFoodsFiltered = computed(() =>
-  filterSource.value === '全部'
-    ? customFoods.foods
-    : customFoods.foods.filter((f) => f.source === filterSource.value)
-)
+const customFoodsFiltered = computed(() => {
+  const kw = searchKw.value.trim()
+  const base =
+    filterSource.value === '全部'
+      ? customFoods.foods
+      : customFoods.foods.filter((f) => f.source === filterSource.value)
+  return kw ? base.filter((f) => f.name.includes(kw)) : base
+})
+const allLibraryRecipes = computed(() => RECIPES.concat(customFoods.recipes))
 
 const importShow = ref(false)
 const imgInput = ref(null)
@@ -458,6 +490,18 @@ async function removeCustom() {
 </script>
 
 <style scoped>
+.library-search {
+  padding: 8px 12px;
+  background: transparent;
+}
+.library-search :deep(.van-search__content) {
+  border-radius: 999px;
+}
+.pcf-legend {
+  padding: 8px 16px 0;
+  font-size: 11px;
+  color: #969799;
+}
 .fit {
   font-size: 11px;
   color: #969799;

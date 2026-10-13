@@ -286,7 +286,7 @@ watch(
 function normalizeSplit() {
   const nums = splitInputs.value.map((v) => Number(v) || 0)
   const sum = nums.reduce((a, b) => a + b, 0)
-  if (sum <= 0) return [0.3, 0.4, 0.3]
+  if (sum <= 0) return [0.25, 0.45, 0.3]
   return nums.map((v) => v / sum) // 不强制=100,按比例归一
 }
 

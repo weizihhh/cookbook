@@ -101,7 +101,7 @@ export function calcTargets(profile) {
     manualKcal = null,
     proteinPerKg = 1.8,
     fatRatio = 0.25,
-    mealSplit = [0.3, 0.4, 0.3],
+    mealSplit = [0.25, 0.45, 0.3],
   } = profile
 
   const bmr = calcBMR({ gender, weight, height, age })
