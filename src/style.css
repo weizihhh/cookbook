@@ -1,0 +1,45 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f7f8fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+    Segoe UI, Arial, Roboto, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft Yahei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  /* 移动优先:桌面端也限制内容宽度居中 */
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+
+.page {
+  padding: 12px 12px calc(66px + env(safe-area-inset-bottom));
+}
+
+.nutri-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.nutri-grid .num {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.nutri-grid .label {
+  font-size: 10px;
+  color: #969799;
+  white-space: nowrap;
+  overflow: hidden;
+}
