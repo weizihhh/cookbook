@@ -68,31 +68,61 @@
           <span v-if="recordDays.length" class="header-sub">已记录 {{ recordDays.length }} 天</span>
         </div>
       </template>
-      <van-calendar
-        :key="calendarKey"
-        class="record-calendar"
-        :poppable="false"
-        :show-confirm="false"
-        :show-title="false"
-        :first-day-of-week="1"
-        :min-date="minDate"
-        :max-date="maxDate"
-        :default-date="defaultSelected"
-        :formatter="dayFormatter"
-        :style="{ height: '320px' }"
-        @select="onSelectDay"
-      />
+      <!-- 翻页月历:箭头跨月查看任意历史记录 -->
+      <div class="calendar">
+        <div class="cal-head">
+          <van-icon
+            name="arrow-left"
+            class="cal-nav"
+            :class="{ disabled: !canPrev }"
+            @click="prevMonth"
+          />
+          <span class="cal-title">{{ calYear }}年{{ calMonth + 1 }}月</span>
+          <van-icon
+            name="arrow-right"
+            class="cal-nav"
+            :class="{ disabled: !canNext }"
+            @click="nextMonth"
+          />
+        </div>
+        <div class="cal-weekrow">
+          <span v-for="w in WEEK_LABELS" :key="w">{{ w }}</span>
+        </div>
+        <div class="cal-grid">
+          <div
+            v-for="(d, i) in monthCells"
+            :key="i"
+            class="cal-cell"
+            :class="{
+              empty: !d,
+              today: d === today,
+              'has-rec': d && d <= today && recordDateSet.has(d),
+              selected: d === selected,
+              future: d > today,
+            }"
+            @click="onPickDay(d)"
+          >
+            <span v-if="d" class="cal-num">{{ Number(d.slice(8, 10)) }}</span>
+          </div>
+        </div>
+        <div class="cal-foot">
+          <span class="cal-today-btn" @click="goToday">回到今天</span>
+        </div>
+      </div>
       <!-- 选中日的食谱 -->
       <div v-if="selected" class="day-detail">
         <div class="detail-head">
           <span class="detail-date" :class="{ today: selected === today }">{{ friendlyDate(selected) }}</span>
           <span class="detail-meta">
             <template v-if="selectedData">
-              <span class="day-kcal">{{ selectedData.totals.kcal }} 千卡 · 蛋白 {{ selectedData.totals.protein }}g</span>
+              <span class="day-kcal">{{ selectedData.totals.kcal }} 千卡</span>
               <van-tag v-if="selectedData.doneCount === 3" type="success" size="medium">全打卡</van-tag>
               <van-icon name="delete-o" class="del-icon" @click="confirmClear(selected)" />
             </template>
           </span>
+        </div>
+        <div v-if="selectedData" class="detail-macros">
+          蛋白 {{ selectedData.totals.protein }}g · 碳水 {{ selectedData.totals.carbs }}g · 脂肪 {{ selectedData.totals.fat }}g
         </div>
         <template v-if="selectedData">
           <div v-for="meal in MEALS" :key="meal.key" class="meal-block">
@@ -135,7 +165,7 @@ import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { todayStr, friendlyDate, toDateStr, weekStartOf, addDays } from '../utils/date'
+import { todayStr, friendlyDate, weekStartOf, addDays } from '../utils/date'
 
 const week = useWeekStore()
 const checkin = useCheckinStore()
@@ -207,7 +237,7 @@ const recordDays = computed(() => {
   const out = []
   for (const [date, meals] of Object.entries(week.days)) {
     if (!meals) continue
-    const totals = { kcal: 0, protein: 0 }
+    const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
     let has = false
     for (const m of MEALS) {
       for (const it of meals[m.key] || []) {
@@ -216,35 +246,76 @@ const recordDays = computed(() => {
         const n = computeNutrition(it.ingredients, FOODS_MAP)
         totals.kcal += n.kcal
         totals.protein += n.protein
+        totals.carbs += n.carbs
+        totals.fat += n.fat
       }
     }
     if (!has) continue
     out.push({
       date,
       meals,
-      totals: { kcal: Math.round(totals.kcal), protein: Math.round(totals.protein) },
+      totals: {
+        kcal: Math.round(totals.kcal),
+        protein: Math.round(totals.protein),
+        carbs: Math.round(totals.carbs),
+        fat: Math.round(totals.fat),
+      },
       doneCount: MEALS.filter((m) => checkin.statusOf(date, m.key) === 'done').length,
     })
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : -1))
 })
 
-// ---- 日历 ----
-const minDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1))
-const maxDate = new Date()
 const recordDateSet = computed(() => new Set(recordDays.value.map((d) => d.date)))
-// 记录变化时重建日历,让 formatter 的"有记录"标记即时生效
-const calendarKey = computed(() => recordDays.value.map((d) => d.date).join(','))
-function dayFormatter(day) {
-  if (recordDateSet.value.has(toDateStr(day.date))) day.className = 'rec-day'
-  return day
+
+// ---- 翻页月历 ----
+const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+const now = new Date()
+const calYear = ref(now.getFullYear())
+const calMonth = ref(now.getMonth())
+// 可翻范围:最早一年前同月,最晚当前月(未来月无记录意义)
+const minYM = (now.getFullYear() - 1) * 12 + now.getMonth()
+const curYM = now.getFullYear() * 12 + now.getMonth()
+const canPrev = computed(() => calYear.value * 12 + calMonth.value > minYM)
+const canNext = computed(() => calYear.value * 12 + calMonth.value < curYM)
+function prevMonth() {
+  if (!canPrev.value) return
+  if (calMonth.value === 0) {
+    calMonth.value = 11
+    calYear.value -= 1
+  } else {
+    calMonth.value -= 1
+  }
 }
+function nextMonth() {
+  if (!canNext.value) return
+  if (calMonth.value === 11) {
+    calMonth.value = 0
+    calYear.value += 1
+  } else {
+    calMonth.value += 1
+  }
+}
+function goToday() {
+  calYear.value = now.getFullYear()
+  calMonth.value = now.getMonth()
+  selected.value = today
+}
+const monthCells = computed(() => {
+  const y = calYear.value
+  const m = calMonth.value
+  const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7 // 周一=0
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  const p = (n) => String(n).padStart(2, '0')
+  const cells = Array.from({ length: firstWeekday }, () => null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(`${y}-${p(m + 1)}-${p(d)}`)
+  return cells
+})
 
 const selected = ref(today)
 const selectedData = computed(() => recordDays.value.find((d) => d.date === selected.value) || null)
-const defaultSelected = computed(() => (recordDateSet.value.has(today) ? new Date() : null))
-function onSelectDay(date) {
-  selected.value = toDateStr(date)
+function onPickDay(d) {
+  if (d && d <= today) selected.value = d
 }
 
 function itemsOf(day, mealKey) {
@@ -328,23 +399,99 @@ async function confirmClear(date) {
 .weight-stats .over {
   color: #ff976a;
 }
-/* 日历:融入卡片,有记录的日子打绿点 */
-.record-calendar {
-  background: transparent;
+/* 翻页月历 */
+.calendar {
+  padding: 4px 12px 0;
 }
-:deep(.rec-day) {
+.cal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 8px;
+}
+.cal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #323233;
+}
+.cal-nav {
+  font-size: 18px;
+  color: var(--cb-primary);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.cal-nav.disabled {
+  color: #c8c9cc;
+  cursor: default;
+}
+.cal-weekrow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  color: #969799;
+  padding-bottom: 4px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 2px;
+}
+.cal-cell {
   position: relative;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-:deep(.rec-day::after) {
+.cal-cell.empty,
+.cal-cell.future {
+  cursor: default;
+}
+.cal-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 13px;
+  color: #323233;
+}
+.cal-cell.today .cal-num {
+  color: var(--cb-primary);
+  font-weight: 700;
+}
+.cal-cell.future .cal-num {
+  color: #c8c9cc;
+}
+.cal-cell.selected .cal-num {
+  background: var(--cb-primary);
+  color: #fff;
+}
+.cal-cell.has-rec::after {
   content: '';
   position: absolute;
-  bottom: 6px;
+  bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--cb-primary);
+}
+.cal-cell.selected.has-rec::after {
+  background: #fff;
+}
+.cal-foot {
+  text-align: center;
+  padding: 6px 0 2px;
+}
+.cal-today-btn {
+  font-size: 12px;
+  color: var(--cb-primary);
+  cursor: pointer;
 }
 .day-detail {
   padding: 4px 16px 14px;
@@ -364,6 +511,11 @@ async function confirmClear(date) {
 }
 .detail-date.today {
   color: var(--cb-primary);
+}
+.detail-macros {
+  font-size: 12px;
+  color: #969799;
+  padding-bottom: 6px;
 }
 .detail-meta {
   display: flex;
