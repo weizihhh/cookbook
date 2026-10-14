@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, summarizeDay, cloneMealItems, computeNutrition } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
@@ -224,12 +224,6 @@ export const useWeekStore = defineStore('week', {
     clearAll() {
       this.days = {}
       this.persist()
-    },
-    summaryOf(date) {
-      const profile = useProfileStore()
-      const meals = this.days[date]
-      if (!meals) return null
-      return summarizeDay({ date, meals }, FOODS_MAP, profile.targets)
     },
   },
 })

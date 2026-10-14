@@ -142,7 +142,9 @@ function vegetableCandidate(recipe, foods) {
 function pickFrom(candidates, usedIds, recentIds = []) {
   const fresh = candidates.filter((r) => !usedIds.has(r.id))
   const pool = fresh.length ? fresh : candidates
-  // 有"最近吃过"偏好时优先从中选:吃得单一的人,生成的就是熟悉的菜
+  // recentIds"最近吃过优先"分支:v0.16.1 起生产 generateDay 不再传入(独占式偏好会让
+  // 重新生成永远复现同一批菜,详见 docs/DECISIONS.md);纯函数能力保留,供将来
+  // "常吃优先"开关复用,行为由 verify 固化
   const recent = pool.filter((r) => recentIds.includes(r.id))
   const finalPool = recent.length ? recent : pool
   if (!finalPool.length) return null
@@ -420,11 +422,10 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
 }
 
 /**
- * 汇总全天营养与目标偏差。
- * skipMealKeys:打卡"跳过"的餐(实际未进食,不计入合计)——今日页/记录页的
- * "已吃"口径由此参数统一传入;缺省为计划口径(全部菜品计入)。
+ * 汇总全天营养与目标偏差 —— "已吃"口径:打卡"跳过"的餐(实际未进食)不计入合计。
+ * 今日页 totals 与记录页统计统一走这里。
  */
-export function summarizeDay(dayPlan, foods, targets, skipMealKeys = []) {
+export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
   const skip = new Set(skipMealKeys)
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
@@ -453,4 +454,9 @@ export function summarizeDay(dayPlan, foods, targets, skipMealKeys = []) {
       protein: diffPct(totals.protein, targets.protein),
     },
   }
+}
+
+/** 汇总全天营养与目标偏差 —— "计划"口径:全部菜品计入(生成流水线与无打卡场景用) */
+export function summarizePlanned(dayPlan, foods, targets) {
+  return summarizeIntake(dayPlan, foods, targets, [])
 }

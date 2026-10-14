@@ -205,7 +205,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeDay } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useWeekStore } from '../stores/week'
@@ -284,7 +284,7 @@ const trendEmptyText = computed(() =>
 )
 
 // ---- 饮食统计:与体重趋势共用本周/本月范围,日均按"已吃"口径(跳过的餐不计);
-// 单日合计走 summarizeDay(skipMealKeys),与今日页 totals 同一实现 ----
+// 单日合计走 summarizeIntake(skipMealKeys),与今日页 totals 同一实现 ----
 const dietStats = computed(() => {
   const days = trendDays.value.filter((d) => d <= today.value)
   let recorded = 0
@@ -297,7 +297,7 @@ const dietStats = computed(() => {
     if (!hasItem) continue
     recorded++
     const skipped = MEALS.filter((m) => checkin.statusOf(d, m.key) === 'skip').map((m) => m.key)
-    const s = summarizeDay({ date: d, meals }, FOODS_MAP, profile.targets, skipped)
+    const s = summarizeIntake({ date: d, meals }, FOODS_MAP, profile.targets, skipped)
     kcalSum += s.totals.kcal
     proteinSum += s.totals.protein
   }

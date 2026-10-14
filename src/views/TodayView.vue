@@ -214,7 +214,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeDay } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
@@ -250,7 +250,6 @@ const modeLabel = computed(
   () => GOAL_MODES.find((m) => m.value === profile.mode)?.label || ''
 )
 const todayMeals = computed(() => week.mealsOf(today.value))
-const summary = computed(() => (todayMeals.value ? week.summaryOf(today.value) : null))
 
 const kcalPercentage = computed(() =>
   targets.value.kcal > 0
@@ -263,7 +262,7 @@ const hasAnyItem = computed(() =>
   MEALS.some((m) => (todayMeals.value?.[m.key] || []).some(Boolean))
 )
 const deviationClass = computed(() => {
-  if (!summary.value || !hasAnyItem.value) return 'none'
+  if (!hasAnyItem.value) return 'none'
   if (allSkipped.value) return 'none'
   const d = Math.round(((totals.value.kcal - targets.value.kcal) / targets.value.kcal) * 100)
   if (Math.abs(d) <= 10) return 'ok'
@@ -303,11 +302,11 @@ const mealActuals = computed(() => {
 })
 
 // 顶部合计按"已吃"口径:跳过的餐次不计入(打卡 skip 表示没吃这餐)。
-// 实现下沉到 summarizeDay(skipMealKeys 参数),与记录页统计共用同一口径
+// 实现下沉到 summarizeIntake(skipMealKeys),与记录页统计共用同一口径
 const totals = computed(() => {
   if (!todayMeals.value) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const skipped = MEALS.filter((m) => mealActuals.value[m.key].skipped).map((m) => m.key)
-  const s = summarizeDay({ date: today.value, meals: todayMeals.value }, FOODS_MAP, targets.value, skipped).totals
+  const s = summarizeIntake({ date: today.value, meals: todayMeals.value }, FOODS_MAP, targets.value, skipped).totals
   return { ...s, protein: Math.round(s.protein) }
 })
 const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]?.skipped))
@@ -325,7 +324,7 @@ const macroRows = computed(() =>
     const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0
     let statusClass = 'none'
     let statusText = '—'
-    if (summary.value && hasAnyItem.value && !allSkipped.value && target > 0) {
+    if (hasAnyItem.value && !allSkipped.value && target > 0) {
       const d = Math.round(((actual - target) / target) * 100)
       if (Math.abs(d) <= 10) {
         statusClass = 'ok'

@@ -5,6 +5,8 @@
 // edible(食部):市售每 1g 中可食部的比例,带壳贝类/整鱼/鸡翅/带棒玉米等 <1。
 // 食谱克数与采购清单均为"市场购买量"口径,营养计算按 grams × edible 折算
 // (官方牡蛎条目按蚝肉计食部 100%,故不标)。未标注 = 100% 可食。
+// 名称限定词((去皮)/(瘦)/(生)/(干)…)只标注官方条目名可核实的口径;
+// 不带限定 ≠ 默认全可食/某种部位——如"鸡胸肉"官方条目未区分去皮,不断定则不加。
 // 调味料(盐/生抽等)用量小不计入营养,写在食谱做法步骤中。
 
 export const FOOD_CATEGORIES = [
@@ -33,7 +35,7 @@ const RAW_FOODS = [
   { id: 'f_whole_wheat_bread', name: '全麦面包', category: 'grain', kcal: 250, protein: 9.0, carbs: 45.0, fat: 4.0, unit: '片', unitGrams: 35 },
   { id: 'f_steamed_bun', name: '馒头', category: 'grain', kcal: 223, protein: 7.0, carbs: 47.0, fat: 1.1, unit: '个', unitGrams: 100 },
   { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200, edible: 0.46 },
-  { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 90, protein: 1.1, carbs: 21.3, fat: 0.2, unit: '个', unitGrams: 100 },
+  { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 103, protein: 1.1, carbs: 24.7, fat: 0.2, unit: '个', unitGrams: 100 },
   { id: 'f_purple_potato', name: '紫薯', category: 'grain', kcal: 82, protein: 1.3, carbs: 18.5, fat: 0.2, unit: '个', unitGrams: 100 },
   { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2, unit: '个', unitGrams: 100 },
   { id: 'f_yam', name: '山药', category: 'grain', kcal: 57, protein: 1.9, carbs: 12.4, fat: 0.2 },
@@ -139,6 +141,9 @@ const RAW_FOODS = [
   { id: 'f_lotus_root', name: '莲藕', category: 'vegetable', kcal: 47, protein: 1.2, carbs: 11.5, fat: 0.2 },
   { id: 'f_bitter_melon', name: '苦瓜', category: 'vegetable', kcal: 22, protein: 1.0, carbs: 4.9, fat: 0.1 },
   { id: 'f_water_bamboo', name: '茭白', category: 'vegetable', kcal: 26, protein: 1.2, carbs: 5.9, fat: 0.2 },
+  // 魔芋结/平菇/木耳等高纤维条目:碳水以葡甘聚糖等可溶性膳食纤维为主(几乎不供能),
+  // Atwater 4kcal/g 加总会系统性偏高(魔芋结 +46%),自检 +50% 正向闸门的余量即为此设计,
+  // 新增银耳/仙草/海苔类条目逼近红线属预期,不要反向"改数凑平"
   { id: 'f_konjac', name: '魔芋结', category: 'vegetable', kcal: 8, protein: 0.2, carbs: 2.5, fat: 0.1 },
   { id: 'f_bok_choy', name: '小油菜', category: 'vegetable', kcal: 15, protein: 1.5, carbs: 2.7, fat: 0.3 },
   { id: 'f_celtuce', name: '莴笋', category: 'vegetable', kcal: 15, protein: 1.0, carbs: 2.8, fat: 0.1 },
@@ -223,20 +228,24 @@ export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
 
 /** 生活化显示:有单位的食材显示"3个(150g)",否则"150g"
  *  小单位(<100g/个)取整(生成端已吸附到整数倍);大单位保留 1 位小数(整数倍跳跃过大)
- *  带壳/带骨食材(edible<1)追加可食部换算,让"买多少/吃多少营养"对用户透明 */
+ *  带壳/带骨食材(edible<1)追加可食部换算,让"买多少/吃多少营养"对用户透明;
+ *  名称带(生)/(干)/(熟)的追加口径角标——生米与熟饭差 3 倍,克数编辑处必须可见 */
+const WEIGHT_BASIS_LABEL = { 生: '生重', 干: '干重', 熟: '熟重' }
 export function formatFoodAmount(food, grams) {
   const g = Math.round(grams)
   const edibleNote =
     food?.edible && food.edible < 1 ? `·约${Math.round(grams * food.edible)}g可食` : ''
+  const basisMatch = food?.name?.match(/\(([生干熟])\)/)
+  const basisNote = basisMatch ? `·${WEIGHT_BASIS_LABEL[basisMatch[1]]}` : ''
   if (food?.unit && food?.unitGrams > 0) {
     const n = grams / food.unitGrams
     const count =
       food.unitGrams < 100
         ? String(Math.max(1, Math.round(n)))
         : String(Math.round(n * 10) / 10)
-    return `${count}${food.unit}(${g}g)${edibleNote}`
+    return `${count}${food.unit}(${g}g)${edibleNote}${basisNote}`
   }
-  return `${g}g${edibleNote}`
+  return `${g}g${edibleNote}${basisNote}`
 }
 
 /** 小单位(<100g/个)克数吸附到整数倍,避免"3袋(100g)"这类袋数与克数不自洽的用量;

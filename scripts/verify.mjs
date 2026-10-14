@@ -2,12 +2,13 @@
 // 覆盖:BMR/TDEE 公式手算对照、食谱食材引用完整性、随机组装收敛性、
 // 排除过滤、换菜、周计划生成、采购清单聚合、日期工具。生成结果含随机性,
 // 连续跑可观察稳定性。
-import { calcTargets } from '../src/core/nutrition.js'
+import { calcTargets, EXCLUDE_TAGS } from '../src/core/nutrition.js'
 import {
   generateDayPlan,
   generateWeekPlan,
   buildShoppingList,
-  summarizeDay,
+  summarizePlanned,
+  summarizeIntake,
   computeNutrition,
   swapSlotItem,
 } from '../src/core/planner.js'
@@ -89,12 +90,14 @@ for (const [meal, items] of Object.entries(plan.meals)) {
 }
 check('全天计划无空槽位', nullSlots.length === 0, nullSlots.join(', '))
 
-const s = summarizeDay(plan, FOODS_MAP, targets)
+const s = summarizePlanned(plan, FOODS_MAP, targets)
 console.log(`      全天合计: ${s.totals.kcal} kcal (目标 ${targets.kcal}, 偏差 ${s.diff.kcal}%), 蛋白 ${s.totals.protein}g (目标 ${targets.protein}g, 偏差 ${s.diff.protein}%)`)
 check('热量偏差在 ±15% 内', Math.abs(s.diff.kcal) <= 15)
 check('蛋白偏差在 -10%~+40% 内(蛋白槽合格池允许90%交付,营养学无害)', s.diff.protein >= -10 && s.diff.protein <= 40)
 
-// 生成偏好:传 recentIds 时三餐全部选自该池(池内每餐每槽位有足量候选)
+// 生成偏好:传 recentIds 时三餐全部选自该池(池内每餐每槽位有足量候选)。
+// 注:v0.16.1 起生产 generateDay 不再传 recentIds(撤下独占偏好),本条守护的是
+// 保留的纯函数能力,供将来"常吃优先"开关复用
 {
   const pool = []
   for (const meal of ['breakfast', 'lunch', 'dinner']) {
@@ -126,7 +129,7 @@ const profiles = [
 for (const p of profiles) {
   const tg = calcTargets(p)
   const pl = generateDayPlan({ recipes: RECIPES, foods: FOODS_MAP, targets: tg, excludedTags: [], date: 'test' })
-  const sm = summarizeDay(pl, FOODS_MAP, tg)
+  const sm = summarizePlanned(pl, FOODS_MAP, tg)
   console.log(`      ${p.gender}/${p.weight}kg/${p.mode}: ${sm.totals.kcal} vs ${tg.kcal} (${sm.diff.kcal}%), 蛋白 ${sm.totals.protein} vs ${tg.protein} (${sm.diff.protein}%)`)
   check(`${p.mode} 画像热量偏差 ±20%`, Math.abs(sm.diff.kcal) <= 20)
 }
@@ -194,7 +197,7 @@ check('单食谱周内复用不超过 3 次', maxReuse <= 3, `max=${maxReuse}`)
 // 周内每天热量都在合理范围
 let worstDev = 0
 for (const [date, meals] of Object.entries(weekPlan)) {
-  const sm = summarizeDay({ date, meals }, FOODS_MAP, targets)
+  const sm = summarizePlanned({ date, meals }, FOODS_MAP, targets)
   worstDev = Math.max(worstDev, Math.abs(sm.diff.kcal))
 }
 check('一周每天热量偏差均 ≤20%', worstDev <= 20, `worst=${Math.round(worstDev)}%`)
@@ -490,15 +493,15 @@ const swapped = swapSlotItem('lunch', 'staple', 'x_s1', {
 })
 check('换菜避开 usedIds 里的食谱(死参数已激活)', swapped?.recipeId === 'x_s3', `got ${swapped?.recipeId}`)
 check('换主食按剩余热量缩放(692kcal → 大米 200g,非固定45%)', swapped?.ingredients[0].grams === 200, `got ${swapped?.ingredients[0]?.grams}`)
-// summarizeDay 口径:skipMealKeys 与今日页/记录页"已吃"口径一致
+// summarizeIntake/Planned 口径:skipMealKeys 与今日页/记录页"已吃"口径一致
 const skipDay = {
   breakfast: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
   lunch: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
   dinner: [],
 }
-const skipTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets, ['lunch'])
-const allTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets)
-check('summarizeDay 排除 skip 餐(288 → 144)', skipTotals.totals.kcal === 144 && allTotals.totals.kcal === 288, `got ${skipTotals.totals.kcal}/${allTotals.totals.kcal}`)
+const skipTotals = summarizeIntake({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets, ['lunch'])
+const allTotals = summarizePlanned({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets)
+check('summarizeIntake 排除 skip 餐(288 → 144)', skipTotals.totals.kcal === 144 && allTotals.totals.kcal === 288, `got ${skipTotals.totals.kcal}/${allTotals.totals.kcal}`)
 
 // ---------- 22. v0.17.0 食部(edible)口径:克数=购买量,营养按可食部折算 ----------
 const clamN = computeNutrition([{ foodId: 'f_clam', grams: 300 }], FOODS_MAP)
@@ -519,6 +522,49 @@ check('虾仁炒西兰花 250g 带壳折算 ≈ 30.6g 蛋白(与旧口径等价)
 // 采购清单聚合的克数是购买量口径(将来恢复 UI 即"买多少")
 const shellList = buildShoppingList({ '2026-10-14': { lunch: [{ recipeId: 'r_clam_broth', slot: 'protein', ingredients: [{ foodId: 'f_clam', grams: 300, scalable: true }] }] } }, FOODS_MAP)
 check('采购清单输出购买量(300g 带壳蛤蜊)', shellList[0]?.grams === 300, JSON.stringify(shellList))
+
+// ---------- 23. v0.17.1 评审 v3 落地:排除组合候选覆盖 / 红薯锚点 / 口径角标 ----------
+// 排除组合边界:全部排除标签的任意单/双组合下,每餐每槽位的实际候选数(蔬菜槽含
+// 100g 门槛,与 assembleMeal 同规则)必须 > 0 —— 防止后续打标/删食谱让"合理排除"
+// 也掏空槽位。既有排除测试只查泄漏不查空槽(filter(Boolean) 会放过 null),本条补上。
+// 已知边界(有意不修,见 docs/DECISIONS.md):egg+milk+soy 三排时早餐蛋白槽为 0,
+// 今日页空态文案会指引用户去设置调整。
+{
+  const tags = EXCLUDE_TAGS.map((t) => t.value)
+  const combos = [
+    ...tags.map((t) => [t]),
+    ...tags.flatMap((t, i) => tags.slice(i + 1).map((u) => [t, u])),
+  ]
+  const vegMainGrams = (r) =>
+    r.ingredients
+      .filter((ing) => FOODS_MAP[ing.foodId]?.category === 'vegetable')
+      .reduce((s, ing) => s + ing.grams, 0)
+  const holes = []
+  for (const ex of combos) {
+    for (const [meal, slots] of Object.entries(MEAL_TEMPLATES)) {
+      for (const slot of slots) {
+        const n = RECIPES.filter(
+          (r) =>
+            r.slot === slot &&
+            r.mealFit.includes(meal) &&
+            r.tags.every((t) => !ex.includes(t)) &&
+            (slot !== 'vegetable' || vegMainGrams(r) >= 100)
+        ).length
+        if (n === 0) holes.push(`${meal}/${slot} @ ${ex.join('+')}`)
+      }
+    }
+  }
+  check(`单/双排除组合下每餐每槽位仍有候选(${combos.length} 组合)`, holes.length === 0, holes.join(', '))
+}
+// 红薯 = 第6版红心甘薯(官方别名即"红薯":432kJ/103kcal、C24.7、食部90%),
+// 曾用 90/21.3 无出处;评审 v3 引用的"红心 61kcal/C15.3"经官方平台核实不成立
+check('红薯对齐第6版红心甘薯(103kcal/C24.7)', FOODS_MAP['f_sweet_potato'].kcal === 103 && FOODS_MAP['f_sweet_potato'].carbs === 24.7)
+check('红薯 200g ≈ 206kcal', computeNutrition([{ foodId: 'f_sweet_potato', grams: 200 }], FOODS_MAP).kcal === 206)
+// 生/干/熟口径角标:克数编辑处必须可见(生米与熟饭差 3 倍)
+check('口径角标:大米(生)', formatFoodAmount(FOODS_MAP['f_rice'], 80) === '80g·生重')
+check('口径角标:挂面(干)', formatFoodAmount(FOODS_MAP['f_noodles_dry'], 100) === '100g·干重')
+check('口径角标:鹰嘴豆(熟)', formatFoodAmount(FOODS_MAP['f_chickpea_cooked'], 100) === '100g·熟重')
+check('口径角标:无标记食材不受影响', formatFoodAmount(FOODS_MAP['f_yam'], 200) === '200g')
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
