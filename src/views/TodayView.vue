@@ -176,176 +176,19 @@
     </template>
 
     <!-- 食谱详情弹层 -->
-    <van-popup
+    <MealDetailPopup
       v-model:show="detailShow"
-      position="bottom"
-      round
-      :style="{ maxHeight: '75%' }"
-    >
-      <div v-if="detailItem" class="detail">
-        <div class="detail-title">
-          {{ recipeName(detailItem.recipeId) }}
-          <van-tag v-if="detailRecipe?.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
-        </div>
-        <div class="nutri-grid" style="margin-bottom: 12px">
-          <div><div class="num">{{ detailNutrition.kcal }}</div><div class="label">千卡</div></div>
-          <div><div class="num">{{ detailNutrition.protein }}g</div><div class="label">蛋白质</div></div>
-          <div><div class="num">{{ detailNutrition.carbs }}g</div><div class="label">碳水</div></div>
-          <div><div class="num">{{ detailNutrition.fat }}g</div><div class="label">脂肪</div></div>
-        </div>
-        <van-cell title="食材用量" />
-        <van-cell v-for="ing in detailItem.ingredients" :key="ing.foodId">
-          <template #title>
-            {{ FOODS_MAP[ing.foodId]?.name }}
-            <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
-          </template>
-          <template #label>{{ formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams) }}</template>
-          <template #value>
-            <!-- 个数型食材按"个"步进,其余按 5g 步进 -->
-            <van-stepper
-              v-if="unitOf(ing.foodId)"
-              :model-value="Math.round((ing.grams / unitGramsOf(ing.foodId)) * 10) / 10"
-              :min="1"
-              :max="Math.ceil(1000 / unitGramsOf(ing.foodId))"
-              :step="1"
-              :decimal-length="unitGramsOf(ing.foodId) >= 100 ? 1 : 0"
-              input-width="40px"
-              button-size="24px"
-              @change="(v) => onGramsChange(ing.foodId, v * unitGramsOf(ing.foodId))"
-            />
-            <van-stepper
-              v-else
-              :model-value="ing.grams"
-              :min="5"
-              :max="1000"
-              :step="5"
-              integer
-              input-width="44px"
-              button-size="24px"
-              @change="(v) => onGramsChange(ing.foodId, v)"
-            />
-          </template>
-        </van-cell>
-        <template v-if="detailRecipe?.steps?.length">
-          <van-cell title="做法" />
-          <div class="steps">
-            <ol>
-              <li v-for="(s, i) in detailRecipe.steps" :key="i">{{ s }}</li>
-            </ol>
-          </div>
-        </template>
-        <div style="display: flex; gap: 10px; margin: 12px 0">
-          <van-button v-if="!detailItem.custom" block type="primary" @click="doSwap">
-            换一个{{ SLOT_LABELS[detailItem.slot] }}
-          </van-button>
-          <van-button block type="danger" plain @click="doRemove">
-            移除此菜
-          </van-button>
-        </div>
-      </div>
-    </van-popup>
+      :item="detailItem"
+      @swap="doSwap"
+      @remove="doRemove"
+      @grams-change="onGramsChange"
+    />
 
     <!-- 添加菜品弹层 -->
-    <van-popup v-model:show="addShow" position="bottom" round :style="{ height: '72%' }">
-      <div class="add-panel">
-        <van-search v-model="addSearch" placeholder="搜索食谱,如:鸡胸、豆腐" />
-        <div v-if="recentRecipeIds.length" class="recent-row">
-          <span class="recent-label">最近</span>
-          <div class="recent-chips">
-            <van-tag
-              v-for="id in recentRecipeIds"
-              :key="id"
-              plain
-              type="primary"
-              size="large"
-              class="recent-chip"
-              @click="quickAdd(id)"
-            >
-              {{ recipeName(id) }}
-            </van-tag>
-          </div>
-        </div>
-        <van-tabs v-model:active="addTab" shrink>
-          <van-tab v-for="s in addSlots" :key="s.value" :title="s.label">
-            <div class="add-list">
-              <van-cell
-                v-for="r in filteredAddRecipes(s.value)"
-                :key="r.id"
-                is-link
-                @click="doAdd(r)"
-              >
-                <template #title>
-                  {{ r.name }}
-                  <van-tag v-if="r.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 4px">抗炎</van-tag>
-                  <van-tag v-if="r.custom" plain type="primary" size="medium" style="margin-left: 4px">
-                    {{ r.source || '自定义' }}
-                  </van-tag>
-                  <van-tag v-if="addSearch.trim() && !r.mealFit.includes(addMealKey)" color="#c8c9cc" size="medium" style="margin-left: 4px">
-                    非{{ addMealLabel }}
-                  </van-tag>
-                </template>
-                <template #value>
-                  <span class="add-kcal">{{ baseKcal(r) }} 千卡/基准份</span>
-                </template>
-              </van-cell>
-              <van-empty v-if="!filteredAddRecipes(s.value).length" image-size="60" description="没有匹配的食谱" />
-            </div>
-          </van-tab>
-        </van-tabs>
-      </div>
-    </van-popup>
+    <AddRecipePopup v-model:show="addShow" :meal-key="addMealKey" @pick="doAdd" />
 
     <!-- 添加确认:先定克数再入餐 -->
-    <van-popup v-model:show="addConfirmShow" position="bottom" round :style="{ maxHeight: '70%' }">
-      <div v-if="addDraft" class="detail">
-        <div class="detail-title">
-          添加:{{ RECIPES_MAP[addDraft.recipeId]?.name }}
-          <van-tag v-if="RECIPES_MAP[addDraft.recipeId]?.antiInfl" color="var(--cb-primary)" size="large" style="vertical-align: 2px">抗炎</van-tag>
-        </div>
-        <van-cell title="用量调整" />
-        <van-cell v-for="ing in addDraft.ingredients" :key="ing.foodId">
-          <template #title>
-            {{ FOODS_MAP[ing.foodId]?.name }}
-            <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
-          </template>
-          <template #label>{{ formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams) }}</template>
-          <template #value>
-            <van-stepper
-              v-if="unitOf(ing.foodId)"
-              :model-value="Math.round((ing.grams / unitGramsOf(ing.foodId)) * 10) / 10"
-              :min="1"
-              :max="Math.ceil(1000 / unitGramsOf(ing.foodId))"
-              :step="1"
-              :decimal-length="unitGramsOf(ing.foodId) >= 100 ? 1 : 0"
-              input-width="40px"
-              button-size="24px"
-              @change="(v) => (ing.grams = Math.round(v * unitGramsOf(ing.foodId)))"
-            />
-            <van-stepper
-              v-else
-              :model-value="ing.grams"
-              :min="5"
-              :max="1000"
-              :step="5"
-              integer
-              input-width="44px"
-              button-size="24px"
-              @change="(v) => (ing.grams = v)"
-            />
-          </template>
-        </van-cell>
-        <div class="nutri-grid" style="margin: 10px 0">
-          <div><div class="num">{{ draftNutrition.kcal }}</div><div class="label">千卡</div></div>
-          <div><div class="num">{{ draftNutrition.protein }}g</div><div class="label">蛋白质</div></div>
-          <div><div class="num">{{ draftNutrition.carbs }}g</div><div class="label">碳水</div></div>
-          <div><div class="num">{{ draftNutrition.fat }}g</div><div class="label">脂肪</div></div>
-        </div>
-        <div style="display: flex; gap: 10px; margin: 12px 0">
-          <van-button block @click="addConfirmShow = false">取消</van-button>
-          <van-button block type="primary" @click="confirmAddDraft">添加</van-button>
-        </div>
-      </div>
-    </van-popup>
+    <AddConfirmPopup v-model:show="addConfirmShow" :draft="addDraft" @confirm="confirmAddDraft" />
 
     <!-- 打卡选择 -->
     <van-action-sheet
@@ -371,9 +214,9 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, recipeMatchesKw } from '../core/planner'
+import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
-import { RECIPES, RECIPES_MAP } from '../data/recipes'
+import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
@@ -381,6 +224,9 @@ import { useWeightStore } from '../stores/weight'
 import { useCustomFoodsStore } from '../stores/customFoods'
 import { todayStr, parseDate, addDays } from '../utils/date'
 import { TIPS } from '../data/tips'
+import MealDetailPopup from '../components/today/MealDetailPopup.vue'
+import AddRecipePopup from '../components/today/AddRecipePopup.vue'
+import AddConfirmPopup from '../components/today/AddConfirmPopup.vue'
 
 const profile = useProfileStore()
 const week = useWeekStore()
@@ -676,7 +522,7 @@ function onCheckinSelect(action) {
   checkin.mark(today, checkinMeal.value, action.value)
 }
 
-// ---- 详情弹层 ----
+// ---- 详情弹层:定位条目,编辑与换菜/移除事件转给 week store ----
 const detailShow = ref(false)
 const detailMealKey = ref(null)
 const detailIndex = ref(-1)
@@ -684,12 +530,6 @@ const detailItem = computed(() =>
   detailShow.value && todayMeals.value && detailMealKey.value != null
     ? todayMeals.value[detailMealKey.value][detailIndex.value]
     : null
-)
-const detailRecipe = computed(() =>
-  detailItem.value ? RECIPES_MAP[detailItem.value.recipeId] : null
-)
-const detailNutrition = computed(() =>
-  detailItem.value ? computeNutrition(detailItem.value.ingredients, FOODS_MAP) : {}
 )
 
 function openDetail(mealKey, index) {
@@ -707,14 +547,6 @@ function doSwap() {
   detailShow.value = false
 }
 
-// ---- 详情编辑:改克数 / 移除 ----
-function unitOf(foodId) {
-  return FOODS_MAP[foodId]?.unit || null
-}
-function unitGramsOf(foodId) {
-  return FOODS_MAP[foodId]?.unitGrams || 100
-}
-
 function onGramsChange(foodId, v) {
   week.updateGrams(today, detailMealKey.value, detailIndex.value, foodId, v)
 }
@@ -725,52 +557,13 @@ function doRemove() {
   showToast('已移除')
 }
 
-// ---- 添加菜品 ----
+// ---- 添加菜品:弹层与确认层为子组件,这里只构造 draft 与入餐 ----
 const addShow = ref(false)
 const addMealKey = ref('')
-const addSearch = ref('')
-const addTab = ref(0)
-const addSlots = [
-  { value: 'all', label: '全部' },
-  { value: 'staple', label: '主食' },
-  { value: 'protein', label: '蛋白' },
-  { value: 'vegetable', label: '蔬菜' },
-  { value: 'fruit', label: '水果' },
-  { value: 'custom', label: '自定义' },
-]
 
 function openAdd(mealKey) {
   addMealKey.value = mealKey
-  addSearch.value = ''
   addShow.value = true
-}
-
-// 最近吃过:与生成偏好共用 store 逻辑(按天倒序去重、skip 餐不计),取前 8
-const recentRecipeIds = computed(() => week.recentRecipeIds(today).slice(0, 8))
-
-function quickAdd(id) {
-  const r = RECIPES_MAP[id]
-  if (r) doAdd(r)
-}
-
-// 搜索会放开到全库,对不属于当前餐次的候选加"非早/午/晚餐"标记
-const addMealLabel = computed(() => MEALS.find((m) => m.key === addMealKey.value)?.label || '')
-
-function filteredAddRecipes(slot) {
-  const kw = addSearch.value.trim()
-  // 种子食谱 + 自定义食物(伪食谱,slot=custom 不进组装池,只在此手动添加)
-  return allAddRecipes.value.filter(
-    (r) =>
-      (slot === 'all' || r.slot === slot) &&
-      (kw ? true : r.mealFit.includes(addMealKey.value)) &&
-      (!kw || recipeMatchesKw(r, kw, FOODS_MAP))
-  )
-}
-
-const allAddRecipes = computed(() => RECIPES.concat(customFoods.recipes))
-
-function baseKcal(recipe) {
-  return computeNutrition(recipe.ingredients, FOODS_MAP).kcal
 }
 
 function doAdd(recipe) {
@@ -791,9 +584,6 @@ function doAdd(recipe) {
 
 const addConfirmShow = ref(false)
 const addDraft = ref(null)
-const draftNutrition = computed(() =>
-  addDraft.value ? computeNutrition(addDraft.value.ingredients, FOODS_MAP) : {}
-)
 
 function confirmAddDraft() {
   if (!addDraft.value) return
@@ -1046,62 +836,5 @@ function ingredientText(item) {
   font-size: 13px;
   color: #646566;
   line-height: 1.7;
-}
-.add-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-.add-list {
-  max-height: calc(72vh - 180px);
-  overflow-y: auto;
-  padding-bottom: 20px;
-}
-.recent-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px 8px;
-}
-.recent-label {
-  flex: 0 0 auto;
-  font-size: 12px;
-  color: #969799;
-}
-.recent-chips {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-}
-.recent-chip {
-  flex: 0 0 auto;
-  cursor: pointer;
-}
-.add-kcal {
-  font-size: 12px;
-  color: #969799;
-}
-.unit-hint {
-  font-size: 11px;
-  color: var(--cb-primary);
-}
-.detail {
-  padding: 16px;
-}
-.detail-title {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-.steps {
-  padding: 0 16px;
-  color: #323233;
-  font-size: 14px;
-  line-height: 1.8;
-}
-.steps ol {
-  padding-left: 18px;
-  margin: 0;
 }
 </style>
