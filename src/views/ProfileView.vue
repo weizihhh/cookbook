@@ -178,6 +178,18 @@
     </van-cell-group>
 
     <van-cell-group inset title="数据管理">
+      <van-cell
+        title="导出数据备份"
+        label="下载 JSON 文件留存,防浏览器数据丢失"
+        is-link
+        @click="doExport"
+      />
+      <van-cell
+        title="导入数据恢复"
+        label="用备份文件覆盖当前全部数据"
+        is-link
+        @click="doImport"
+      />
       <van-cell title="恢复默认设置" is-link @click="doReset" />
     </van-cell-group>
   </div>
@@ -200,7 +212,8 @@ import { useWeekStore } from '../stores/week'
 import { useWeightStore } from '../stores/weight'
 import { useCheckinStore } from '../stores/checkin'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { removeState } from '../utils/storage'
+import { removeState, exportAll, importFile } from '../utils/storage'
+import { todayStr } from '../utils/date'
 import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
@@ -368,6 +381,67 @@ watch(
 )
 
 // ---- 数据管理 ----
+// 备份走 localStorage 全量(cookbook:* 前缀的每个 store 各一个 key),不逐 store 枚举,
+// 新增 store 天然纳入备份范围
+const LS_PREFIX = 'cookbook:'
+function collectBackup() {
+  const data = {}
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (!k?.startsWith(LS_PREFIX)) continue
+    try {
+      data[k.slice(LS_PREFIX.length)] = JSON.parse(localStorage.getItem(k))
+    } catch {
+      /* 跳过无法解析的项 */
+    }
+  }
+  return data
+}
+
+function doExport() {
+  const data = collectBackup()
+  exportAll(
+    { app: 'cookbook', exportedAt: new Date().toLocaleString('zh-CN'), data },
+    `cookbook-backup-${todayStr()}.json`
+  )
+  showToast(`已导出 ${Object.keys(data).length} 项数据`)
+}
+
+function doImport() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json,application/json'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    let backup
+    try {
+      backup = await importFile(file)
+    } catch (e) {
+      showToast(e.message || '导入失败')
+      return
+    }
+    if (backup?.app !== 'cookbook' || !backup.data || typeof backup.data !== 'object') {
+      showToast('不是有效的备份文件')
+      return
+    }
+    try {
+      await showConfirmDialog({
+        title: '导入备份',
+        message: `备份时间:${backup.exportedAt || '未知'}。导入将覆盖当前全部数据(设置、饮食记录、打卡、体重、自定义食物),确定继续?`,
+      })
+    } catch {
+      return
+    }
+    for (const [k, v] of Object.entries(backup.data)) {
+      localStorage.setItem(LS_PREFIX + k, JSON.stringify(v))
+    }
+    showToast('已导入,即将刷新')
+    setTimeout(() => window.location.reload(), 600)
+  }
+  input.click()
+}
+
 async function doReset() {
   try {
     await showConfirmDialog({ title: '恢复默认', message: '将清空全部设置、周计划、打卡、体重记录与自定义食物,确定?' })

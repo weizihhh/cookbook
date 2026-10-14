@@ -382,5 +382,23 @@ const shoppingWithCustom = buildShoppingList({ '2026-10-13': meals5 }, FOODS_MAP
 check('自定义食物不进采购清单', shoppingWithCustom.length === 0, JSON.stringify(shoppingWithCustom))
 delete FOODS_MAP['cf_verify']
 
+// ---------- 17. 复制昨日条目(cloneMealItems) ----------
+const { cloneMealItems } = await import('../src/core/planner.js')
+const srcMeal = [
+  { recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] },
+  null, // 组装失败遗留的空槽位应被剔除
+]
+const copiedMeal = cloneMealItems(srcMeal)
+copiedMeal[0].ingredients[0].grams = 250
+check(
+  '复制条目为独立副本:剔除空槽,改副本不影响源',
+  copiedMeal.length === 1 &&
+    copiedMeal[0].ingredients[0].grams === 250 &&
+    srcMeal[0].ingredients[0].grams === 100 &&
+    srcMeal.length === 2,
+  JSON.stringify({ copied: copiedMeal.length, srcGrams: srcMeal[0].ingredients[0].grams })
+)
+check('复制条目保留 recipeId/slot/custom 标记', copiedMeal[0].recipeId === 'r_boiled_egg' && copiedMeal[0].slot === 'protein')
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

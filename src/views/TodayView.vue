@@ -143,6 +143,16 @@
             <van-button size="small" round plain type="primary" @click="openCheckin(meal.key)">
               打卡 · {{ checkinText(meal.key) }}
             </van-button>
+            <van-button
+              v-if="yesterdayCount(meal.key)"
+              size="small"
+              round
+              plain
+              type="primary"
+              @click="copyYesterday(meal.key)"
+            >
+              复制昨日
+            </van-button>
           </div>
         </van-cell-group>
 
@@ -360,7 +370,7 @@ import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { todayStr, parseDate } from '../utils/date'
+import { todayStr, parseDate, addDays } from '../utils/date'
 import { TIPS } from '../data/tips'
 
 const profile = useProfileStore()
@@ -370,6 +380,7 @@ const weight = useWeightStore()
 const customFoods = useCustomFoodsStore()
 customFoods.sync() // 注册进 RECIPES_MAP,添加菜品/详情/加餐链路即席可用
 const today = todayStr()
+const yesterday = addDays(today, -1)
 
 // 按日期轮换,一天一条看完全部
 const dailyTip = computed(() => {
@@ -546,6 +557,18 @@ async function clearToday() {
 }
 function mealItems(mealKey) {
   return todayMeals.value?.[mealKey] || []
+}
+
+// ---- 复制昨日:吃的单一固定时,一键把昨天同餐的记录搬到今天 ----
+function yesterdayCount(mealKey) {
+  return (week.mealsOf(yesterday)?.[mealKey] || []).filter(Boolean).length
+}
+function copyYesterday(mealKey) {
+  const n = week.copyMeal(yesterday, today, mealKey)
+  if (n) {
+    const label = MEALS.find((m) => m.key === mealKey)?.label || ''
+    showToast(`已复制昨日${label} ${n} 个菜品`)
+  }
 }
 
 // ---- 体重 ----

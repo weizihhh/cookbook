@@ -4,7 +4,7 @@
     <van-cell-group inset style="margin-bottom: 12px">
       <template #title>
         <div class="card-header">
-          <span>体重趋势</span>
+          <span>记录统计</span>
           <div class="range-switch">
             <span
               v-for="r in RANGES"
@@ -57,6 +57,39 @@
         <span v-if="weight.records.length >= 2" :class="weight.totalChange <= 0 ? 'ok' : 'over'">
           · 较首次 {{ weight.totalChange > 0 ? '+' : '' }}{{ weight.totalChange.toFixed(1) }}kg
         </span>
+      </div>
+
+      <!-- 饮食统计:与上方体重趋势共用范围切换 -->
+      <div class="stat-divider"></div>
+      <div class="diet-stats">
+        <div class="diet-row">
+          <span class="diet-label">饮食记录</span>
+          <span class="diet-val">{{ dietStats.recorded }} / {{ dietStats.totalDays }} 天</span>
+        </div>
+        <template v-if="dietStats.recorded">
+          <div class="diet-row">
+            <span class="diet-label">日均热量</span>
+            <span class="diet-val">
+              <b>{{ dietStats.kcal }}</b> / {{ dietStats.kcalTarget }} 千卡
+              <i :class="pctClass(dietStats.kcalPct)">{{ pctText(dietStats.kcalPct) }}</i>
+            </span>
+          </div>
+          <div class="diet-row">
+            <span class="diet-label">日均蛋白</span>
+            <span class="diet-val">
+              <b>{{ dietStats.protein }}</b> / {{ dietStats.proteinTarget }} g
+              <i :class="pctClass(dietStats.proteinPct)">{{ pctText(dietStats.proteinPct) }}</i>
+            </span>
+          </div>
+          <div v-if="dietStats.weightChange != null" class="diet-row">
+            <span class="diet-label">区间体重</span>
+            <span class="diet-val" :class="dietStats.weightChange <= 0 ? 'ok' : 'over'">
+              {{ dietStats.weightChange > 0 ? '+' : '' }}{{ dietStats.weightChange.toFixed(1) }} kg({{ dietStats.weightCount }} 次)
+            </span>
+          </div>
+          <div class="diet-note">目标按当前设置计算 · 跳过的餐不计入</div>
+        </template>
+        <div v-else class="diet-note">{{ trendRange === 'week' ? '本周' : '本月' }}还没有饮食记录</div>
       </div>
     </van-cell-group>
 
@@ -178,12 +211,14 @@ import { RECIPES_MAP } from '../data/recipes'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
+import { useProfileStore } from '../stores/profile'
 import { useCustomFoodsStore } from '../stores/customFoods'
 import { todayStr, friendlyDate, weekStartOf, addDays } from '../utils/date'
 
 const week = useWeekStore()
 const checkin = useCheckinStore()
 const weight = useWeightStore()
+const profile = useProfileStore()
 const customFoods = useCustomFoodsStore()
 customFoods.sync() // 注册进 RECIPES_MAP,历史记录里的自定义食物可显示名称
 
@@ -245,6 +280,60 @@ const trendEmptyText = computed(() =>
     ? '记录 2 次起显示趋势,去今日页记录体重'
     : `${trendRange.value === 'week' ? '本周' : '本月'}记录不足 2 条,可切换范围查看`
 )
+
+// ---- 饮食统计:与体重趋势共用本周/本月范围,日均按"已吃"口径(跳过的餐不计) ----
+const dietStats = computed(() => {
+  const days = trendDays.value.filter((d) => d <= today)
+  let recorded = 0
+  let kcalSum = 0
+  let proteinSum = 0
+  for (const d of days) {
+    const meals = week.days[d]
+    if (!meals) continue
+    let hasItem = false
+    for (const m of MEALS) {
+      const skipped = checkin.statusOf(d, m.key) === 'skip'
+      for (const it of meals[m.key] || []) {
+        if (!it) continue
+        hasItem = true
+        if (skipped) continue
+        const n = computeNutrition(it.ingredients, FOODS_MAP)
+        kcalSum += n.kcal
+        proteinSum += n.protein
+      }
+    }
+    if (hasItem) recorded++
+  }
+  const tg = profile.targets
+  const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
+  const kcal = recorded ? Math.round(kcalSum / recorded) : 0
+  const protein = recorded ? Math.round(proteinSum / recorded) : 0
+  // 区间内体重变化(首尾对照,≥2 次称重才有意义)
+  const inRange = weight.records.filter((r) => trendDays.value.includes(r.date))
+  return {
+    recorded,
+    totalDays: days.length,
+    kcal,
+    kcalTarget: tg.kcal,
+    kcalPct: pctOf(kcal, tg.kcal),
+    protein,
+    proteinTarget: Math.round(tg.protein),
+    proteinPct: pctOf(protein, tg.protein),
+    weightChange: inRange.length >= 2 ? inRange[inRange.length - 1].kg - inRange[0].kg : null,
+    weightCount: inRange.length,
+  }
+})
+// 与今日页一致的达标口径:±10% 达标
+function pctClass(pct) {
+  const d = pct - 100
+  if (Math.abs(d) <= 10) return 'ok'
+  return d > 0 ? 'over' : 'under'
+}
+function pctText(pct) {
+  const d = pct - 100
+  if (Math.abs(d) <= 10) return '达标 ✓'
+  return d > 0 ? `超 ${d}%` : `低 ${-d}%`
+}
 
 // ---- 每日记录数据(供日历标记与详情) ----
 const recordDays = computed(() => {
@@ -437,6 +526,54 @@ async function confirmClear(date) {
 }
 .weight-stats .over {
   color: #ff976a;
+}
+/* 饮食统计 */
+.stat-divider {
+  height: 1px;
+  background: #eef2f0;
+  margin: 4px 16px 10px;
+}
+.diet-stats {
+  padding: 0 16px 12px;
+}
+.diet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+.diet-label {
+  font-size: 12px;
+  color: #969799;
+}
+.diet-val {
+  font-size: 13px;
+  color: #646566;
+}
+.diet-val b {
+  color: var(--cb-text, #1f2d27);
+  font-weight: 600;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.diet-val i {
+  font-style: normal;
+  font-size: 11px;
+  margin-left: 4px;
+}
+.diet-stats .ok {
+  color: var(--cb-primary);
+}
+.diet-stats .over {
+  color: #ee0a24;
+}
+.diet-stats .under {
+  color: #ff976a;
+}
+.diet-note {
+  font-size: 11px;
+  color: #c8c9cc;
+  padding-top: 4px;
 }
 /* 翻页月历 */
 .calendar {

@@ -346,6 +346,16 @@ export function makeBaselineItem(recipe) {
   }
 }
 
+/** 深拷贝一餐的全部条目(剔除空槽位);改副本不得影响源天记录 */
+export function cloneMealItems(items) {
+  return (items || [])
+    .filter(Boolean)
+    .map((it) => ({
+      ...it,
+      ingredients: it.ingredients.map((ing) => ({ ...ing })),
+    }))
+}
+
 /**
  * 向一餐添加菜品:已有同食谱则克数累加(吃 4 个鸡蛋不必加 4 遍条目)
  * @param ingredients 可选,自定义克数的食材表;缺省用食谱基准份
