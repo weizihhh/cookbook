@@ -355,6 +355,15 @@
       close-on-click-action
       @select="onCheckinSelect"
     />
+
+    <!-- 复制方式选择:今天该餐已有菜品时,问追加还是覆盖 -->
+    <van-action-sheet
+      v-model:show="copySheetShow"
+      :actions="copySheetActions"
+      cancel-text="取消"
+      close-on-click-action
+      @select="onCopySheetSelect"
+    />
   </div>
 </template>
 
@@ -591,12 +600,33 @@ function mealItems(mealKey) {
 function yesterdayCount(mealKey) {
   return (week.mealsOf(yesterday)?.[mealKey] || []).filter(Boolean).length
 }
+// 今天该餐为空直接复制;已有菜品时让用户选追加还是覆盖
 function copyYesterday(mealKey) {
-  const n = week.copyMeal(yesterday, today, mealKey)
-  if (n) {
-    const label = MEALS.find((m) => m.key === mealKey)?.label || ''
-    showToast(`已复制昨日${label} ${n} 个菜品`)
+  if (!mealItems(mealKey).length) {
+    doCopyYesterday(mealKey, 'copy')
+    return
   }
+  copySheetMeal.value = mealKey
+  copySheetShow.value = true
+}
+const copySheetShow = ref(false)
+const copySheetMeal = ref('')
+const copySheetActions = [
+  { name: '追加到现有菜品后', value: 'append' },
+  { name: '覆盖现有菜品', value: 'replace' },
+]
+function onCopySheetSelect(action) {
+  doCopyYesterday(copySheetMeal.value, action.value)
+}
+function doCopyYesterday(mealKey, mode) {
+  const label = MEALS.find((m) => m.key === mealKey)?.label || ''
+  const n = week.copyMeal(yesterday, today, mealKey, mode === 'replace')
+  if (!n) return
+  // 覆盖=该餐记录重来,清掉旧打卡标记防悬挂
+  if (mode === 'replace') checkin.mark(today, mealKey, null)
+  const prefix =
+    mode === 'replace' ? `已覆盖为昨日${label}` : mode === 'append' ? `已追加昨日${label}` : `已复制昨日${label}`
+  showToast(`${prefix} ${n} 个菜品`)
 }
 
 // ---- 体重 ----

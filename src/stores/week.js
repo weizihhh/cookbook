@@ -178,12 +178,13 @@ export const useWeekStore = defineStore('week', {
       if (removed > 0) this.persist()
       return removed
     },
-    /** 把某天某餐复制到另一天同餐(条目追加,打卡状态不带),返回复制条数 */
-    copyMeal(fromDate, toDate, mealKey) {
+    /** 把某天某餐复制到另一天同餐(打卡状态不带);replace 时先清目标餐再复制,返回复制条数 */
+    copyMeal(fromDate, toDate, mealKey, replace = false) {
       const items = cloneMealItems(this.days[fromDate]?.[mealKey])
       if (!items.length) return 0
       this.syncWeekOf(toDate)
       if (!this.days[toDate]) this.days[toDate] = { breakfast: [], lunch: [], dinner: [] }
+      if (replace) this.days[toDate][mealKey] = []
       this.days[toDate][mealKey].push(...items)
       this.persist()
       return items.length
