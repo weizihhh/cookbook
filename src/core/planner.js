@@ -28,6 +28,10 @@ const S_MAX = 3
 // (油盐等 scalable=false 的固定佐料不受此限)
 const GRAMS_MIN = 20
 const GRAMS_MAX = 500
+// 主食槽单食材更严的上限:低热量密度主食(芋头 81kcal/100g、南瓜)按剩余热量
+// 倒推时体积爆炸,500g 蒸芋头远超一餐常规量(膳食指南薯类 50-100g/天),收到 300g;
+// 蔬菜/蛋白槽维持 500g(大份蔬菜是减脂期合理场景)
+const STAPLE_GRAMS_MAX = 300
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 const r1 = (v) => Math.round(v * 10) / 10
@@ -90,10 +94,11 @@ export function scaleRecipe(recipe, foods, { byProtein = null, byKcal = null, ma
     if (!ing.scalable) return { ...ing }
     const f = foods[ing.foodId]
     const isSmallUnit = f?.unit && f.unitGrams > 0 && f.unitGrams < 100
-    // 小单位食材吸附到整数倍(与显示/步进对齐),其余走绝对克数边界
+    // 小单位食材吸附到整数倍(与显示/步进对齐),其余走绝对克数边界(主食槽更严)
+    const gramsMax = recipe.slot === 'staple' ? STAPLE_GRAMS_MAX : GRAMS_MAX
     const grams = isSmallUnit
       ? snapGramsToUnit(f, ing.grams * s)
-      : clamp(ing.grams * s, GRAMS_MIN, GRAMS_MAX)
+      : clamp(ing.grams * s, GRAMS_MIN, gramsMax)
     return { foodId: ing.foodId, grams: Math.round(grams), scalable: ing.scalable }
   })
   return { recipeId: recipe.id, slot: recipe.slot, ingredients, scale: r1(s) }
@@ -137,17 +142,22 @@ function usedKcal(items, foods) {
 }
 
 /**
- * 按"缩放范围内可交付量"挑候选:能交付 ≥90% 目标的优先入池再随机,
+ * 与 scaleRecipe 完全同口径的真实交付量:s 上限、克数边界、单位吸附之后的实际
+ * 营养(含固定佐料)。选择判据必须用它——理论值 base×s 会被克数上限截断,
+ * 低密度主食曾以"自称能交付"混进合格池,实际交付不足
+ */
+function realDeliverable(recipe, foods, metric, want) {
+  const scaled = scaleRecipe(recipe, foods, metric === 'kcal' ? { byKcal: want } : { byProtein: want })
+  return computeNutrition(scaled.ingredients, foods)[metric]
+}
+
+/**
+ * 按"真实可交付量"挑候选:能交付 ≥90% 目标的优先入池再随机,
  * 都不够时从交付量最高的前5个随机,兼顾达标与多样性
  */
 function pickScored(candidates, usedIds, foods, metric, want, recentIds = []) {
   if (!candidates.length) return null
-  const scored = candidates.map((r) => {
-    const base = scalableBase(r, foods)
-    const deliverable =
-      base[metric] > 0 ? base[metric] * clamp(want / base[metric], S_MIN, S_MAX) : 0
-    return { r, deliverable }
-  })
+  const scored = candidates.map((r) => ({ r, deliverable: realDeliverable(r, foods, metric, want) }))
   let pool = scored.filter((c) => !usedIds.has(c.r.id))
   if (!pool.length) pool = scored
   // 最近吃过优先于营养最优:生成只是参考起点,吃固定的菜的人要的是熟悉的组合

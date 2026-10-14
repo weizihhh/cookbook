@@ -429,5 +429,40 @@ check('有效体重:涨满2kg上调一档', effectiveWeight(70, 72) === 72)
 check('有效体重:降满2kg下调一档', effectiveWeight(70, 68) === 68)
 check('有效体重:朝档案体重保守(涨/降3.9只按2)', effectiveWeight(70, 73.9) === 72 && effectiveWeight(70, 66.1) === 68)
 
+// ---------- 20. v0.16.2 主食克数上限与真实交付口径 ----------
+const { scaleRecipe, assembleMeal } = await import('../src/core/planner.js')
+// 主食槽上限 300:600kcal 剩余热量下蒸芋头不再被推到 500g
+const taroScaled = scaleRecipe(RECIPES_MAP['r_steamed_taro'], FOODS_MAP, { byKcal: 600 })
+check('主食槽克数上限 300g(芋头高剩余热量收到 300)', taroScaled.ingredients[0].grams === 300, `got ${taroScaled.ingredients[0].grams}`)
+// 非主食槽维持 500:合成蔬菜 200g 基准 ×3 = 600g → 截到 500
+const bigVeg = { id: 'x_veg', name: '合成蔬菜', slot: 'vegetable', mealFit: ['lunch'], tags: [], ingredients: [{ foodId: 'f_broccoli', grams: 200, scalable: true }], steps: [] }
+check('非主食槽克数上限仍 500g', scaleRecipe(bigVeg, FOODS_MAP, { byKcal: 9999 }).ingredients[0].grams === 500)
+// 真实交付口径:剩余热量高时芋头(300g 上限只交 ~243kcal)不再"假合格",
+// 高密度主食(燕麦 338kcal/100g)独占合格池。蛋白/水果用合成食谱锁死上下文:
+// 蛋白槽缩放后 ~153kcal + 火龙果 110kcal → 剩余 ~637kcal(90% 线 573)
+const synthStaples = [
+  { id: 'x_taro', name: '合成芋头主食', slot: 'staple', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_taro', grams: 250, scalable: true }], steps: [] },
+  { id: 'x_oat', name: '合成燕麦主食', slot: 'staple', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_oats', grams: 60, scalable: true }], steps: [] },
+]
+const synthContext = [
+  { id: 'x_prot', name: '合成蛋白', slot: 'protein', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_chicken_breast', grams: 120, scalable: true }], steps: [] },
+  { id: 'x_fruit', name: '合成水果', slot: 'fruit', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_dragon_fruit', grams: 200, scalable: false }], steps: [] },
+]
+const pickedStaples = new Set()
+for (let i = 0; i < 5; i++) {
+  const items = assembleMeal('breakfast', { recipes: synthStaples.concat(synthContext), foods: FOODS_MAP, target: { kcal: 900, protein: 30 }, excludedTags: [], usedIds: new Set() })
+  const st = items.find((it) => it?.slot === 'staple')
+  if (st) pickedStaples.add(st.recipeId)
+}
+check('高剩余热量下低密度主食不再入选(燕麦独占合格池)', pickedStaples.size === 1 && pickedStaples.has('x_oat'), [...pickedStaples].join(','))
+// 生成端到端:高热量画像(bulk 90kg)全天主食食材克数均 ≤300(小单位吸附路径天然不超)
+const bigT = calcTargets({ gender: 'male', age: 30, height: 185, weight: 90, activity: 1.725, mode: 'bulk' })
+const bigPlan = generateDayPlan({ recipes: RECIPES, foods: FOODS_MAP, targets: bigT, excludedTags: [], date: 'test-big' })
+const overStaple = Object.values(bigPlan.meals).flat()
+  .filter((it) => it?.slot === 'staple')
+  .flatMap((it) => it.ingredients)
+  .filter((ing) => ing.grams > 300)
+check('生成结果主食食材克数均 ≤300g', overStaple.length === 0, JSON.stringify(overStaple))
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
