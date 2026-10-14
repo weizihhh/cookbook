@@ -64,7 +64,7 @@ import { FOODS_MAP } from '../../data/foods'
 import { RECIPES, RECIPES_MAP } from '../../data/recipes'
 import { useWeekStore } from '../../stores/week'
 import { useCustomFoodsStore } from '../../stores/customFoods'
-import { todayStr } from '../../utils/date'
+import { useToday } from '../../composables/useToday'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -74,7 +74,7 @@ const emit = defineEmits(['update:show', 'pick'])
 
 const week = useWeekStore()
 const customFoods = useCustomFoodsStore()
-const today = todayStr()
+const today = useToday()
 
 const addSearch = ref('')
 const addTab = ref(0)
@@ -101,7 +101,7 @@ const addSlots = [
 const addMealLabel = computed(() => MEALS.find((m) => m.key === props.mealKey)?.label || '')
 
 // 最近吃过:与生成偏好共用 store 逻辑(按天倒序去重、skip 餐不计),取前 8
-const recentRecipeIds = computed(() => week.recentRecipeIds(today).slice(0, 8))
+const recentRecipeIds = computed(() => week.recentRecipeIds(today.value).slice(0, 8))
 
 // 种子食谱 + 自定义食物(伪食谱,slot=custom 不进组装池,只在此手动添加)
 const allAddRecipes = computed(() => RECIPES.concat(customFoods.recipes))

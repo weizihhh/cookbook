@@ -205,7 +205,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeDay } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useWeekStore } from '../stores/week'
@@ -213,7 +213,8 @@ import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
 import { useProfileStore } from '../stores/profile'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { todayStr, friendlyDate, weekStartOf, addDays } from '../utils/date'
+import { friendlyDate, weekStartOf, addDays, parseDate } from '../utils/date'
+import { useToday } from '../composables/useToday'
 
 const week = useWeekStore()
 const checkin = useCheckinStore()
@@ -222,7 +223,8 @@ const profile = useProfileStore()
 const customFoods = useCustomFoodsStore()
 customFoods.sync() // 注册进 RECIPES_MAP,历史记录里的自定义食物可显示名称
 
-const today = todayStr()
+// 跨零点自愈:月历"今天"高亮与未来天判断随日期刷新(与今日页共用同一实例)
+const today = useToday()
 
 // ---- 体重趋势:x 轴单位始终为天(范围内的每一天占一个等宽刻度) ----
 const RANGES = [
@@ -232,10 +234,10 @@ const RANGES = [
 const trendRange = ref('week')
 const trendDays = computed(() => {
   if (trendRange.value === 'week') {
-    const start = weekStartOf(today)
+    const start = weekStartOf(today.value)
     return Array.from({ length: 7 }, (_, i) => addDays(start, i))
   }
-  const [y, m] = today.split('-').map(Number)
+  const [y, m] = today.value.split('-').map(Number)
   const last = new Date(y, m, 0).getDate()
   return Array.from(
     { length: last },
@@ -281,28 +283,23 @@ const trendEmptyText = computed(() =>
     : `${trendRange.value === 'week' ? '本周' : '本月'}记录不足 2 条,可切换范围查看`
 )
 
-// ---- 饮食统计:与体重趋势共用本周/本月范围,日均按"已吃"口径(跳过的餐不计) ----
+// ---- 饮食统计:与体重趋势共用本周/本月范围,日均按"已吃"口径(跳过的餐不计);
+// 单日合计走 summarizeDay(skipMealKeys),与今日页 totals 同一实现 ----
 const dietStats = computed(() => {
-  const days = trendDays.value.filter((d) => d <= today)
+  const days = trendDays.value.filter((d) => d <= today.value)
   let recorded = 0
   let kcalSum = 0
   let proteinSum = 0
   for (const d of days) {
     const meals = week.days[d]
     if (!meals) continue
-    let hasItem = false
-    for (const m of MEALS) {
-      const skipped = checkin.statusOf(d, m.key) === 'skip'
-      for (const it of meals[m.key] || []) {
-        if (!it) continue
-        hasItem = true
-        if (skipped) continue
-        const n = computeNutrition(it.ingredients, FOODS_MAP)
-        kcalSum += n.kcal
-        proteinSum += n.protein
-      }
-    }
-    if (hasItem) recorded++
+    const hasItem = MEALS.some((m) => (meals[m.key] || []).some(Boolean))
+    if (!hasItem) continue
+    recorded++
+    const skipped = MEALS.filter((m) => checkin.statusOf(d, m.key) === 'skip').map((m) => m.key)
+    const s = summarizeDay({ date: d, meals }, FOODS_MAP, profile.targets, skipped)
+    kcalSum += s.totals.kcal
+    proteinSum += s.totals.protein
   }
   const tg = profile.targets
   const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -400,9 +397,10 @@ function nextMonth() {
   }
 }
 function goToday() {
-  calYear.value = now.getFullYear()
-  calMonth.value = now.getMonth()
-  selected.value = today
+  const t = parseDate(today.value) // 跨零点后从刷新过的 today 取年月,不留挂载时的旧值
+  calYear.value = t.getFullYear()
+  calMonth.value = t.getMonth()
+  selected.value = today.value
 }
 
 // ---- 年月跳转 ----
@@ -440,10 +438,10 @@ const monthCells = computed(() => {
   return cells
 })
 
-const selected = ref(today)
+const selected = ref(today.value)
 const selectedData = computed(() => recordDays.value.find((d) => d.date === selected.value) || null)
 function onPickDay(d) {
-  if (d && d <= today) selected.value = d
+  if (d && d <= today.value) selected.value = d
 }
 
 function itemsOf(day, mealKey) {

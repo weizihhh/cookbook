@@ -12,11 +12,20 @@ export function loadState(key, fallback) {
   }
 }
 
+let lastQuotaToastAt = 0
+
 export function saveState(key, value) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value))
-  } catch {
-    /* 存储满/隐私模式时静默失败,不阻塞主流程 */
+  } catch (e) {
+    /* 一般性失败(隐私模式等)保持静默,不阻塞主流程;但配额满意味着后续记录
+       会持续丢失,必须让用户知道并去导出备份(30 秒节流防连环弹) */
+    if ((e?.name === 'QuotaExceededError' || e?.code === 22) && Date.now() - lastQuotaToastAt > 30000) {
+      lastQuotaToastAt = Date.now()
+      import('vant')
+        .then((m) => m.showToast('本地存储已满,新记录可能保存失败,请尽快到设置页导出备份'))
+        .catch(() => {})
+    }
   }
 }
 

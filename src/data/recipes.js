@@ -602,7 +602,7 @@ const RAW_RECIPES = [
       { foodId: 'f_green_pepper', grams: 80, scalable: false },
       { foodId: 'f_olive_oil', grams: 6, scalable: false },
     ],
-    steps: ['鸡腿切块焯水', '少油煸炒,加土豆、生抽老抽、辣椒,炖25分钟', '收汁前下青椒块'],
+    steps: ['鸡腿去皮切块焯水(数据按去皮口径计)', '少油煸炒,加土豆、生抽老抽、辣椒,炖25分钟', '收汁前下青椒块'],
   },
   {
     id: 'r_yuba_celery', name: '腐竹拌芹菜', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['soy'],
@@ -974,7 +974,7 @@ const RAW_RECIPES = [
     id: 'r_tomato_egg', name: '番茄炒蛋', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: ['egg'],
     ingredients: [
       { foodId: 'f_tomato', grams: 200, scalable: false },
-      { foodId: 'f_egg', grams: 50, scalable: true },
+      { foodId: 'f_egg', grams: 50, scalable: false },
       { foodId: 'f_olive_oil', grams: 7, scalable: false },
     ],
     steps: ['1个鸡蛋打散,少油炒成块盛出', '番茄切块炒出汁,倒回蛋块,加盐少量糖'],
@@ -1070,15 +1070,16 @@ const RAW_RECIPES = [
     ingredients: [{ foodId: 'f_pomegranate', grams: 200, scalable: false }], steps: ['切块剥籽吃'] },
 ]
 
-// 食谱抗炎派生:含 ≥2 种抗炎食材(油也计入,如"橄榄油+菠菜"),
-// 或含 ≥80g 非油抗炎主料(如 200g 西兰花单品)即标注
+// 食谱抗炎派生:含 ≥2 种非油抗炎食材,或含 ≥80g 非油抗炎主料(如 200g 西兰花
+// 单品)即标注。油类不计入"种数"——否则"5g 紫菜 + 2g 油"也凑成两种,标签失去
+// 区分度(紫菜汤曾因此误标)
 const OIL_IDS = new Set(['f_olive_oil', 'f_peanut_oil', 'f_flaxseed_oil'])
 
 export const RECIPES = RAW_RECIPES.map((r) => {
-  const antiIngs = r.ingredients.filter((i) => FOODS_MAP[i.foodId]?.antiInfl)
-  const mainAntiGrams = antiIngs
-    .filter((i) => !OIL_IDS.has(i.foodId))
-    .reduce((s, i) => s + i.grams, 0)
+  const antiIngs = r.ingredients.filter(
+    (i) => FOODS_MAP[i.foodId]?.antiInfl && !OIL_IDS.has(i.foodId)
+  )
+  const mainAntiGrams = antiIngs.reduce((s, i) => s + i.grams, 0)
   return { ...r, antiInfl: antiIngs.length >= 2 || mainAntiGrams >= 80 }
 })
 

@@ -1,6 +1,7 @@
 // 食材营养库(种子数据)
-// 数值为每 100g 可食部分的近似值,参照《中国食物成分表》公开数据整理,
-// 与市售具体产品有差异,仅供规划参考。
+// 数值为每 100g 可食部分的近似值,以《中国食物成分表 标准版》第 6 版为基准
+// (经中国疾控中心营养与健康所食物营养成分查询平台逐条核对),与市售具体
+// 产品有差异,仅供规划参考。
 // 调味料(盐/生抽等)用量小不计入营养,写在食谱做法步骤中。
 
 export const FOOD_CATEGORIES = [
@@ -20,7 +21,7 @@ const RAW_FOODS = [
   { id: 'f_rice', name: '大米(生)', category: 'grain', kcal: 346, protein: 7.4, carbs: 77.9, fat: 0.8 },
   { id: 'f_brown_rice', name: '糙米(生)', category: 'grain', kcal: 348, protein: 7.7, carbs: 75.0, fat: 2.7 },
   { id: 'f_millet', name: '小米(生)', category: 'grain', kcal: 361, protein: 9.0, carbs: 75.1, fat: 3.1 },
-  { id: 'f_oats', name: '燕麦片', category: 'grain', kcal: 338, protein: 15.0, carbs: 61.0, fat: 6.7 },
+  { id: 'f_oats', name: '燕麦片', category: 'grain', kcal: 381, protein: 15.0, carbs: 66.9, fat: 6.7 },
   { id: 'f_whole_wheat_flour', name: '全麦面粉', category: 'grain', kcal: 344, protein: 13.2, carbs: 72.0, fat: 2.5 },
   { id: 'f_buckwheat_noodle', name: '荞麦面(干)', category: 'grain', kcal: 340, protein: 12.0, carbs: 70.0, fat: 2.5 },
   { id: 'f_pasta', name: '意大利面(干)', category: 'grain', kcal: 371, protein: 13.0, carbs: 75.0, fat: 1.5 },
@@ -44,7 +45,7 @@ const RAW_FOODS = [
   { id: 'f_glutinous_rice', name: '糯米(生)', category: 'grain', kcal: 350, protein: 7.3, carbs: 78.3, fat: 0.8 },
 
   // ---------- 畜禽肉 ----------
-  { id: 'f_chicken_breast', name: '鸡胸肉', category: 'meat', kcal: 133, protein: 22.0, carbs: 0, fat: 5.0 },
+  { id: 'f_chicken_breast', name: '鸡胸肉', category: 'meat', kcal: 133, protein: 19.4, carbs: 2.5, fat: 5.0 },
   { id: 'f_chicken_leg', name: '鸡腿肉(去皮)', category: 'meat', kcal: 120, protein: 20.0, carbs: 0, fat: 4.0 },
   { id: 'f_chicken_wing', name: '鸡翅', category: 'meat', kcal: 194, protein: 17.4, carbs: 1.5, fat: 11.8, unit: '个', unitGrams: 50 },
   { id: 'f_beef_lean', name: '牛肉(瘦)', category: 'meat', kcal: 118, protein: 21.0, carbs: 1.0, fat: 3.5 },
@@ -55,7 +56,7 @@ const RAW_FOODS = [
   { id: 'f_duck_breast', name: '鸭胸肉(去皮)', category: 'meat', kcal: 133, protein: 18.0, carbs: 0, fat: 6.0 },
   { id: 'f_pork_liver', name: '猪肝', category: 'meat', kcal: 129, protein: 19.3, carbs: 4.0, fat: 3.5 },
   { id: 'f_chicken_liver', name: '鸡肝', category: 'meat', kcal: 121, protein: 16.6, carbs: 2.8, fat: 4.8 },
-  { id: 'f_beef_brisket', name: '牛腩', category: 'meat', kcal: 332, protein: 17.0, carbs: 0.1, fat: 24.0 },
+  { id: 'f_beef_brisket', name: '牛腩', category: 'meat', kcal: 332, protein: 17.1, carbs: 0, fat: 29.3 },
   { id: 'f_pork_ribs', name: '猪肋排', category: 'meat', kcal: 270, protein: 17.0, carbs: 0.7, fat: 21.0 },
   { id: 'f_beef_tenderloin', name: '牛里脊', category: 'meat', kcal: 113, protein: 22.0, carbs: 1.0, fat: 3.0 },
   { id: 'f_rabbit', name: '兔肉', category: 'meat', kcal: 102, protein: 19.7, carbs: 0.9, fat: 2.2 },
@@ -138,7 +139,7 @@ const RAW_FOODS = [
   { id: 'f_konjac', name: '魔芋结', category: 'vegetable', kcal: 8, protein: 0.2, carbs: 2.5, fat: 0.1 },
   { id: 'f_bok_choy', name: '小油菜', category: 'vegetable', kcal: 15, protein: 1.5, carbs: 2.7, fat: 0.3 },
   { id: 'f_celtuce', name: '莴笋', category: 'vegetable', kcal: 15, protein: 1.0, carbs: 2.8, fat: 0.1 },
-  { id: 'f_garlic_sprout', name: '蒜薹', category: 'vegetable', kcal: 61, protein: 2.0, carbs: 8.0, fat: 0.1 },
+  { id: 'f_garlic_sprout', name: '蒜薹', category: 'vegetable', kcal: 61, protein: 2.0, carbs: 15.4, fat: 0.1 },
   { id: 'f_snow_pea', name: '荷兰豆', category: 'vegetable', kcal: 30, protein: 2.5, carbs: 4.9, fat: 0.3 },
   { id: 'f_onion', name: '洋葱', category: 'vegetable', kcal: 40, protein: 1.1, carbs: 9.0, fat: 0.2 },
   { id: 'f_green_pepper', name: '青椒', category: 'vegetable', kcal: 23, protein: 1.4, carbs: 5.4, fat: 0.3 },

@@ -1,24 +1,43 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, summarizeDay, cloneMealItems } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, summarizeDay, cloneMealItems, computeNutrition } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
-import { todayStr, weekStartOf } from '../utils/date'
+import { todayStr, weekStartOf, addDays } from '../utils/date'
 
 const KEY = 'week'
 
 /** 读取并迁移 v0.1 的单日 plan 数据到周结构(迁移后清除旧 key,避免重复迁移) */
 function initState() {
   const saved = loadState(KEY, null)
-  if (saved?.days) return saved
+  if (saved?.days) {
+    pruneStaleEmptyDays(saved.days)
+    return saved
+  }
   const oldPlan = loadState('plan', null)
   if (oldPlan?.meals && oldPlan.date) {
     removeState('plan')
     return { weekStart: weekStartOf(oldPlan.date), days: { [oldPlan.date]: oldPlan.meals } }
   }
   return { weekStart: weekStartOf(todayStr()), days: {} }
+}
+
+/** 数据治理:清掉 180 天前"生成过但没有任何菜品"的空天(有内容的天永不清理),
+ *  防止长期使用把 localStorage 撑满;改动立即写回 */
+function pruneStaleEmptyDays(days) {
+  const cutoff = addDays(todayStr(), -180)
+  let changed = false
+  for (const [date, meals] of Object.entries(days)) {
+    if (date >= cutoff) continue
+    const hasContent = ['breakfast', 'lunch', 'dinner'].some((k) => (meals?.[k] || []).some(Boolean))
+    if (!hasContent) {
+      delete days[date]
+      changed = true
+    }
+  }
+  if (changed) saveState(KEY, { weekStart: weekStartOf(todayStr()), days })
 }
 
 export const useWeekStore = defineStore('week', {
@@ -106,12 +125,18 @@ export const useWeekStore = defineStore('week', {
           .map((it) => it.recipeId)
       )
       const target = profile.targets.meals.find((m) => m.key === mealKey)
+      // 换主食按该餐剩余热量缩放(扣掉其它条目已占用的),不再用固定 45% 估算
+      const othersKcal = list.reduce(
+        (s, it, i) => (i === idx || !it ? s : s + computeNutrition(it.ingredients, FOODS_MAP).kcal),
+        0
+      )
       const next = swapSlotItem(mealKey, slot, current?.recipeId, {
         recipes: RECIPES,
         foods: FOODS_MAP,
         target,
         excludedTags: profile.excludedTags,
         usedIds,
+        stapleKcal: Math.max(80, target.kcal - othersKcal),
       })
       if (!next) return false
       meals[mealKey][idx] = next

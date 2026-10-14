@@ -214,7 +214,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeDay } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
@@ -222,7 +222,8 @@ import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
 import { useCustomFoodsStore } from '../stores/customFoods'
-import { todayStr, parseDate, addDays } from '../utils/date'
+import { parseDate, addDays } from '../utils/date'
+import { useToday } from '../composables/useToday'
 import { TIPS } from '../data/tips'
 import MealDetailPopup from '../components/today/MealDetailPopup.vue'
 import AddRecipePopup from '../components/today/AddRecipePopup.vue'
@@ -234,12 +235,13 @@ const checkin = useCheckinStore()
 const weight = useWeightStore()
 const customFoods = useCustomFoodsStore()
 customFoods.sync() // 注册进 RECIPES_MAP,添加菜品/详情/加餐链路即席可用
-const today = todayStr()
-const yesterday = addDays(today, -1)
+// 跨零点自愈:页面常驻后台过夜后 today 会刷新为新的当天,记录/打卡不再写错日期
+const today = useToday()
+const yesterday = computed(() => addDays(today.value, -1))
 
 // 按日期轮换,一天一条看完全部
 const dailyTip = computed(() => {
-  const dayNumber = Math.floor(parseDate(today).getTime() / 86400000)
+  const dayNumber = Math.floor(parseDate(today.value).getTime() / 86400000)
   return TIPS[dayNumber % TIPS.length]
 })
 
@@ -247,8 +249,8 @@ const targets = computed(() => profile.targets)
 const modeLabel = computed(
   () => GOAL_MODES.find((m) => m.value === profile.mode)?.label || ''
 )
-const todayMeals = computed(() => week.mealsOf(today))
-const summary = computed(() => (todayMeals.value ? week.summaryOf(today) : null))
+const todayMeals = computed(() => week.mealsOf(today.value))
+const summary = computed(() => (todayMeals.value ? week.summaryOf(today.value) : null))
 
 const kcalPercentage = computed(() =>
   targets.value.kcal > 0
@@ -294,32 +296,19 @@ const mealActuals = computed(() => {
     out[m.key] = {
       kcal: Math.round(total.kcal),
       protein: Math.round(total.protein),
-      skipped: checkin.statusOf(today, m.key) === 'skip',
+      skipped: checkin.statusOf(today.value, m.key) === 'skip',
     }
   }
   return out
 })
 
-// 顶部合计按"已吃"口径:跳过的餐次不计入(打卡 skip 表示没吃这餐)
+// 顶部合计按"已吃"口径:跳过的餐次不计入(打卡 skip 表示没吃这餐)。
+// 实现下沉到 summarizeDay(skipMealKeys 参数),与记录页统计共用同一口径
 const totals = computed(() => {
   if (!todayMeals.value) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  const out = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  for (const m of MEALS) {
-    if (mealActuals.value[m.key].skipped) continue
-    for (const it of todayMeals.value[m.key] || []) {
-      if (!it) continue
-      const n = computeNutrition(it.ingredients, FOODS_MAP)
-      out.kcal += n.kcal
-      out.protein += n.protein
-      out.carbs += n.carbs
-      out.fat += n.fat
-    }
-  }
-  out.kcal = Math.round(out.kcal)
-  out.protein = Math.round(out.protein)
-  out.carbs = Math.round(out.carbs * 10) / 10
-  out.fat = Math.round(out.fat * 10) / 10
-  return out
+  const skipped = MEALS.filter((m) => mealActuals.value[m.key].skipped).map((m) => m.key)
+  const s = summarizeDay({ date: today.value, meals: todayMeals.value }, FOODS_MAP, targets.value, skipped).totals
+  return { ...s, protein: Math.round(s.protein) }
 })
 const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]?.skipped))
 
@@ -374,7 +363,7 @@ const remainingText = computed(() => {
 // 重新生成:已打卡"已吃"的餐视为锁定(与清空保护同语义)——先问是否一并重生成;
 // 被重新生成的餐同步清打卡标记,避免"已吃/跳过"悬挂到新内容上
 async function generate() {
-  const locked = MEALS.filter((m) => checkin.statusOf(today, m.key) === 'done')
+  const locked = MEALS.filter((m) => checkin.statusOf(today.value, m.key) === 'done')
   if (!locked.length) {
     regen([])
     return
@@ -396,20 +385,23 @@ async function generate() {
 }
 
 function regen(keepMealKeys, lockedNames = '') {
-  week.generateDay(today, keepMealKeys)
+  week.generateDay(today.value, keepMealKeys)
   const keep = new Set(keepMealKeys)
   for (const m of MEALS) {
-    if (!keep.has(m.key)) checkin.mark(today, m.key, null)
+    // 重新生成的餐清打卡;保留的餐若内容为空(此前对空餐打过卡)同样清,
+    // 避免"已吃"标记悬空在空餐上与"未记录"同屏矛盾
+    const keptEmpty = keep.has(m.key) && !(week.mealsOf(today.value)?.[m.key] || []).some(Boolean)
+    if (!keep.has(m.key) || keptEmpty) checkin.mark(today.value, m.key, null)
   }
   showToast(lockedNames ? `已重新生成,保留已吃的${lockedNames}` : '已生成')
 }
 // 清空:已打卡"已吃"的餐视为锁定——先问是否一并清;取消则保留已吃的餐,只清其余。
 // 清掉的餐同步清打卡标记,避免"已吃/跳过"tag 悬挂在空餐上。
 async function clearToday() {
-  const locked = MEALS.filter((m) => checkin.statusOf(today, m.key) === 'done')
+  const locked = MEALS.filter((m) => checkin.statusOf(today.value, m.key) === 'done')
   if (!locked.length) {
-    week.clearDay(today)
-    for (const m of MEALS) checkin.mark(today, m.key, null)
+    week.clearDay(today.value)
+    for (const m of MEALS) checkin.mark(today.value, m.key, null)
     showToast('已清空')
     return
   }
@@ -427,13 +419,13 @@ async function clearToday() {
     clearAll = false
   }
   if (clearAll) {
-    week.clearDay(today)
-    for (const m of MEALS) checkin.mark(today, m.key, null)
+    week.clearDay(today.value)
+    for (const m of MEALS) checkin.mark(today.value, m.key, null)
     showToast('已清空')
   } else {
-    week.clearDayExcept(today, locked.map((m) => m.key))
+    week.clearDayExcept(today.value, locked.map((m) => m.key))
     for (const m of MEALS) {
-      if (checkin.statusOf(today, m.key) !== 'done') checkin.mark(today, m.key, null)
+      if (checkin.statusOf(today.value, m.key) !== 'done') checkin.mark(today.value, m.key, null)
     }
     showToast(`已清空,保留已吃的${names}`)
   }
@@ -444,7 +436,7 @@ function mealItems(mealKey) {
 
 // ---- 复制昨日:吃的单一固定时,一键把昨天同餐的记录搬到今天 ----
 function yesterdayCount(mealKey) {
-  return (week.mealsOf(yesterday)?.[mealKey] || []).filter(Boolean).length
+  return (week.mealsOf(yesterday.value)?.[mealKey] || []).filter(Boolean).length
 }
 // 今天该餐为空直接复制;已有菜品时让用户选追加还是覆盖
 function copyYesterday(mealKey) {
@@ -466,17 +458,17 @@ function onCopySheetSelect(action) {
 }
 function doCopyYesterday(mealKey, mode) {
   const label = MEALS.find((m) => m.key === mealKey)?.label || ''
-  const n = week.copyMeal(yesterday, today, mealKey, mode === 'replace')
+  const n = week.copyMeal(yesterday.value, today.value, mealKey, mode === 'replace')
   if (!n) return
   // 覆盖=该餐记录重来,清掉旧打卡标记防悬挂
-  if (mode === 'replace') checkin.mark(today, mealKey, null)
+  if (mode === 'replace') checkin.mark(today.value, mealKey, null)
   const prefix =
     mode === 'replace' ? `已覆盖为昨日${label}` : mode === 'append' ? `已追加昨日${label}` : `已复制昨日${label}`
   showToast(`${prefix} ${n} 个菜品`)
 }
 
 // ---- 体重 ----
-const weightInput = ref(weight.kgOf(today) != null ? String(weight.kgOf(today)) : '')
+const weightInput = ref(weight.kgOf(today.value) != null ? String(weight.kgOf(today.value)) : '')
 
 function logWeight() {
   const kg = Number(weightInput.value)
@@ -484,7 +476,7 @@ function logWeight() {
     showToast('请输入有效体重')
     return
   }
-  weight.log(today, kg)
+  weight.log(today.value, kg)
   showToast('已记录')
 }
 
@@ -511,7 +503,7 @@ const checkinActions = [
   { name: '清除打卡', value: null },
 ]
 function checkinText(mealKey) {
-  const s = checkin.statusOf(today, mealKey)
+  const s = checkin.statusOf(today.value, mealKey)
   return s === 'done' ? '已吃 ✓' : s === 'skip' ? '跳过' : '未打卡'
 }
 function openCheckin(mealKey) {
@@ -519,7 +511,7 @@ function openCheckin(mealKey) {
   checkinShow.value = true
 }
 function onCheckinSelect(action) {
-  checkin.mark(today, checkinMeal.value, action.value)
+  checkin.mark(today.value, checkinMeal.value, action.value)
 }
 
 // ---- 详情弹层:定位条目,编辑与换菜/移除事件转给 week store ----
@@ -539,7 +531,7 @@ function openDetail(mealKey, index) {
 }
 
 function doSwap() {
-  const ok = week.swap(today, detailMealKey.value, detailItem.value.slot, detailIndex.value)
+  const ok = week.swap(today.value, detailMealKey.value, detailItem.value.slot, detailIndex.value)
   if (!ok) {
     showToast('没有其他可用的候选了')
     return
@@ -548,11 +540,11 @@ function doSwap() {
 }
 
 function onGramsChange(foodId, v) {
-  week.updateGrams(today, detailMealKey.value, detailIndex.value, foodId, v)
+  week.updateGrams(today.value, detailMealKey.value, detailIndex.value, foodId, v)
 }
 
 function doRemove() {
-  week.removeItem(today, detailMealKey.value, detailIndex.value)
+  week.removeItem(today.value, detailMealKey.value, detailIndex.value)
   detailShow.value = false
   showToast('已移除')
 }
@@ -588,11 +580,11 @@ const addDraft = ref(null)
 function confirmAddDraft() {
   if (!addDraft.value) return
   const recipe = RECIPES_MAP[addDraft.value.recipeId]
-  const result = week.addItemCustom(today, addMealKey.value, recipe.id, addDraft.value.ingredients)
+  const result = week.addItemCustom(today.value, addMealKey.value, recipe.id, addDraft.value.ingredients)
   if (result === 'added') {
     showToast(`已添加:${recipe.name}`)
   } else if (result === 'merged') {
-    const main = week.mealsOf(today)?.[addMealKey.value]?.find((it) => it.recipeId === recipe.id)
+    const main = week.mealsOf(today.value)?.[addMealKey.value]?.find((it) => it.recipeId === recipe.id)
     const mainIng = main?.ingredients.find((i) => i.scalable) || main?.ingredients[0]
     showToast(`已累加:${recipe.name}(共 ${formatFoodAmount(FOODS_MAP[mainIng?.foodId], mainIng?.grams || 0)})`)
   }

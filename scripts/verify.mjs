@@ -54,11 +54,14 @@ for (const r of RECIPES) {
 }
 check('食谱食材引用完整', badRefs.length === 0, badRefs.join('; '))
 
-// 营养参考:成分表 kcal 按 蛋白4/脂肪9/可利用碳水4/膳食纤维≈2 计,高纤维蔬菜
-// 的 4P+4C+9F 会系统性偏高,阈值取 50% 用于抓数量级手误而非学术精度
+// 营养参考:成分表 kcal 按 蛋白4/脂肪9/可利用碳水4/膳食纤维≈2 计。高纤维蔬菜
+// 的 4P+4C+9F 会系统性偏高,正向阈值取 50% 抓数量级手误;负向收紧到 12%——
+// 高水分/高脂食材(鸡翅/三文鱼/北豆腐等官方条目)Atwater 加总本就普遍偏低
+// 3~10%,但碳水/脂肪抄错(蒜薹曾 -33%、牛腩曾 -14%)一定深于 12%
 const badKcal = FOODS.filter((f) => {
   const calc = f.protein * 4 + f.carbs * 4 + f.fat * 9
-  return Math.abs(calc - f.kcal) / Math.max(f.kcal, 1) > 0.5
+  const dev = (calc - f.kcal) / Math.max(f.kcal, 1)
+  return dev < -0.12 || dev > 0.5
 })
 check('食材热量与三大营养素自洽', badKcal.length === 0, badKcal.map((f) => `${f.name}: ${f.kcal} vs ${Math.round(f.protein * 4 + f.carbs * 4 + f.fat * 9)}`).join('; '))
 
@@ -145,8 +148,9 @@ const swapResult = swapSlotItem('lunch', 'protein', plan.meals.lunch.find((i) =>
 check('换菜返回不同食谱', swapResult && swapResult.recipeId !== plan.meals.lunch.find((i) => i.slot === 'protein').recipeId)
 
 // ---------- 6. computeNutrition 基准校验 ----------
+// 鸡胸为第6版官方口径(133kcal/P19.4/C2.5/F5.0):曾误用 22.0g 蛋白的另一套数据
 const chicken = computeNutrition([{ foodId: 'f_chicken_breast', grams: 150 }], FOODS_MAP)
-check('150g 鸡胸 ≈ 200kcal/33g 蛋白', chicken.kcal === 200 && Math.abs(chicken.protein - 33) < 0.5, `got ${chicken.kcal}/${chicken.protein}`)
+check('150g 鸡胸 ≈ 200kcal/29.1g 蛋白(第6版 19.4g/100g)', chicken.kcal === 200 && Math.abs(chicken.protein - 29.1) < 0.5, `got ${chicken.kcal}/${chicken.protein}`)
 
 // ---------- 7. 日期工具 ----------
 check('addDays 跨月', addDays('2026-10-30', 3) === '2026-11-02')
@@ -268,19 +272,7 @@ const cutPreset = MACRO_PRESETS.find((p) => p.value === 'cut')
 const tCut = calcTargets({ gender: 'male', age: 30, height: 175, weight: 70, activity: 1.375, mode: 'cut', proteinPerKg: cutPreset.proteinPerKg, fatRatio: cutPreset.fatRatio })
 check('减脂预设蛋白 = 2.0g/kg × 70 = 140g', Math.abs(tCut.protein - 140) < 0.01, `got ${tCut.protein}`)
 
-// ---------- 13. 自定义编辑(基准份构造) ----------
-const { makeBaselineItem } = await import('../src/core/planner.js')
-const baseline = makeBaselineItem(RECIPES_MAP['r_pan_fried_chicken'])
-const baseOk =
-  baseline.recipeId === 'r_pan_fried_chicken' &&
-  baseline.slot === 'protein' &&
-  baseline.ingredients.length === RECIPES_MAP['r_pan_fried_chicken'].ingredients.length &&
-  baseline.ingredients[0].grams === 150 // 基准克数,未缩放
-check('makeBaselineItem 返回基准份且不缩放', baseOk, JSON.stringify(baseline))
-const baselineNutrition = computeNutrition(baseline.ingredients, FOODS_MAP)
-check('基准份营养 = 150g鸡胸+5g油 ≈ 244千卡', baselineNutrition.kcal === 244, `got ${baselineNutrition.kcal}`)
-
-// ---------- 14. 添加菜品累加 ----------
+// ---------- 13. 添加菜品累加(原 makeBaselineItem 死代码已删,基准份由 addItemToMeal 直接构造) ----------
 const { addItemToMeal } = await import('../src/core/planner.js')
 const meals4 = {
   breakfast: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
@@ -463,6 +455,50 @@ const overStaple = Object.values(bigPlan.meals).flat()
   .flatMap((it) => it.ingredients)
   .filter((ing) => ing.grams > 300)
 check('生成结果主食食材克数均 ≤300g', overStaple.length === 0, JSON.stringify(overStaple))
+
+// ---------- 21. v0.16.3 数据修正与口径回归 ----------
+// 食材数据锚点(第6版官方口径,防止回退):燕麦 381、蒜薹总碳水 15.4、牛腩脂肪 29.3
+check('燕麦片 50g ≈ 191kcal(381/100g)', computeNutrition([{ foodId: 'f_oats', grams: 50 }], FOODS_MAP).kcal === 191)
+check('蒜薹 150g 碳水 ≈ 23.1g(总碳水15.4,曾误用蒜苗的8.0)', Math.abs(computeNutrition([{ foodId: 'f_garlic_sprout', grams: 150 }], FOODS_MAP).carbs - 23.1) < 0.1)
+check('牛腩脂肪 = 29.3g(与 332kcal 自洽,曾误抄 24.0)', FOODS_MAP['f_beef_brisket'].fat === 29.3)
+// 蔬菜槽资格:紫菜汤(5g 紫菜 + 2g 油)不再作为蔬菜槽候选,用户仍可手动添加
+const synthRealVeg = {
+  id: 'x_veg_real', name: '合成足量蔬菜', slot: 'vegetable', mealFit: ['lunch'], tags: [],
+  ingredients: [{ foodId: 'f_broccoli', grams: 200, scalable: false }], steps: [],
+}
+let laverPicked = false
+for (let i = 0; i < 10; i++) {
+  const items = assembleMeal('lunch', {
+    recipes: [synthRealVeg, RECIPES_MAP['r_laver_soup']],
+    foods: FOODS_MAP, target: { kcal: 700, protein: 40 }, excludedTags: [], usedIds: new Set(),
+  })
+  const veg = items.find((it) => it?.slot === 'vegetable')
+  if (veg?.recipeId === 'r_laver_soup') laverPicked = true
+}
+check('紫菜汤退出蔬菜槽候选池(蔬菜主料门槛100g,随机10次不选中)', !laverPicked)
+// 抗炎派生:油类不计入"种数",紫菜汤不再误标
+check('紫菜汤不再标抗炎(油不计种数)', RECIPES_MAP['r_laver_soup']?.antiInfl === false)
+check('杂粮饭仍标抗炎(两种非油抗炎主料)', RECIPES_MAP['r_mixed_grain_rice']?.antiInfl === true)
+// 换菜:避开已用过的食谱;主食按传入剩余热量缩放
+const synthSwap = ['x_s1', 'x_s2', 'x_s3'].map((id) => ({
+  id, name: `合成主食${id}`, slot: 'staple', mealFit: ['lunch'], tags: [],
+  ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }], steps: [],
+}))
+const swapped = swapSlotItem('lunch', 'staple', 'x_s1', {
+  recipes: synthSwap, foods: FOODS_MAP, target: { kcal: 700, protein: 30 },
+  excludedTags: [], usedIds: new Set(['x_s2']), stapleKcal: 692,
+})
+check('换菜避开 usedIds 里的食谱(死参数已激活)', swapped?.recipeId === 'x_s3', `got ${swapped?.recipeId}`)
+check('换主食按剩余热量缩放(692kcal → 大米 200g,非固定45%)', swapped?.ingredients[0].grams === 200, `got ${swapped?.ingredients[0]?.grams}`)
+// summarizeDay 口径:skipMealKeys 与今日页/记录页"已吃"口径一致
+const skipDay = {
+  breakfast: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
+  lunch: [{ recipeId: 'r_boiled_egg', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }] }],
+  dinner: [],
+}
+const skipTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets, ['lunch'])
+const allTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets)
+check('summarizeDay 排除 skip 餐(288 → 144)', skipTotals.totals.kcal === 144 && allTotals.totals.kcal === 288, `got ${skipTotals.totals.kcal}/${allTotals.totals.kcal}`)
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

@@ -124,6 +124,19 @@ export function recipeMatchesKw(recipe, kw, foods) {
   })
 }
 
+/** 蔬菜槽资格:蔬菜类主料合计克数。蔬菜槽的模板意图是每餐保住足量蔬菜(纤维与
+ *  微量营养素),5g 干紫菜的"紫菜汤"不够格——门槛见 vegetableCandidate */
+function vegetableGrams(recipe, foods) {
+  return recipe.ingredients
+    .filter((ing) => foods[ing.foodId]?.category === 'vegetable')
+    .reduce((s, ing) => s + ing.grams, 0)
+}
+
+/** 蔬菜槽候选:非汤类点缀(蔬菜主料 ≥100g)才进组装/换菜池;用户仍可手动添加 */
+function vegetableCandidate(recipe, foods) {
+  return vegetableGrams(recipe, foods) >= 100
+}
+
 function pickFrom(candidates, usedIds, recentIds = []) {
   const fresh = candidates.filter((r) => !usedIds.has(r.id))
   const pool = fresh.length ? fresh : candidates
@@ -178,10 +191,12 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   const slots = MEAL_TEMPLATES[mealKey]
   const items = {}
 
-  // 1) 蔬菜/水果:固定份,先算营养
+  // 1) 蔬菜/水果:固定份,先算营养(蔬菜槽要求蔬菜主料 ≥100g,汤类点缀不占槽)
   for (const slot of ['vegetable', 'fruit']) {
     if (!slots.includes(slot)) continue
-    const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
+    const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags }).filter(
+      (r) => slot !== 'vegetable' || vegetableCandidate(r, foods)
+    )
     const recipe = pickFrom(cand, usedIds, recentIds)
     if (!recipe) {
       items[slot] = null
@@ -337,10 +352,17 @@ function categoryOrder(c) {
   return i === -1 ? 99 : i
 }
 
-/** 单槽位换菜:返回换好的 planItem(排除当前食谱,给一个不同的候选) */
-export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, target, excludedTags, usedIds }) {
-  const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
-  const pool = cand.filter((r) => r.id !== currentRecipeId)
+/**
+ * 单槽位换菜:返回换好的 planItem(排除当前食谱,给一个不同的候选)。
+ * usedIds 里是全库已出现过的食谱 id,候选尽量避开(吃出新鲜感),池子耗尽才回退。
+ * stapleKcal 为该餐其它条目占用后的剩余热量;缺省按经验占比 45% 估算。
+ */
+export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, target, excludedTags, usedIds, stapleKcal = null }) {
+  let cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
+  if (slot === 'vegetable') cand = cand.filter((r) => vegetableCandidate(r, foods))
+  const used = usedIds || new Set()
+  let pool = cand.filter((r) => r.id !== currentRecipeId && !used.has(r.id))
+  if (!pool.length) pool = cand.filter((r) => r.id !== currentRecipeId)
   if (!pool.length) return null
   const recipe = pool[Math.floor(Math.random() * pool.length)]
 
@@ -351,18 +373,10 @@ export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, t
     })
   }
   if (slot === 'staple') {
-    return scaleRecipe(recipe, foods, { byKcal: target.kcal * 0.45 }) // 换主食时无上下文可扣,按经验占比45%
+    const byKcal = Math.max(80, stapleKcal != null ? stapleKcal : target.kcal * 0.45)
+    return scaleRecipe(recipe, foods, { byKcal })
   }
   return { recipeId: recipe.id, slot, ingredients: recipe.ingredients.map((ing) => ({ ...ing })) }
-}
-
-/** 基准份 planItem(自定义添加菜品用):按食谱基准克数,不按目标缩放 */
-export function makeBaselineItem(recipe) {
-  return {
-    recipeId: recipe.id,
-    slot: recipe.slot,
-    ingredients: recipe.ingredients.map((ing) => ({ ...ing })),
-  }
 }
 
 /** 深拷贝一餐的全部条目(剔除空槽位);改副本不得影响源天记录 */
@@ -403,10 +417,16 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
   return 'added'
 }
 
-/** 汇总全天营养与目标偏差 */
-export function summarizeDay(dayPlan, foods, targets) {
+/**
+ * 汇总全天营养与目标偏差。
+ * skipMealKeys:打卡"跳过"的餐(实际未进食,不计入合计)——今日页/记录页的
+ * "已吃"口径由此参数统一传入;缺省为计划口径(全部菜品计入)。
+ */
+export function summarizeDay(dayPlan, foods, targets, skipMealKeys = []) {
+  const skip = new Set(skipMealKeys)
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+    if (skip.has(mealKey)) continue
     for (const item of dayPlan.meals[mealKey] || []) {
       if (!item) continue
       const n = computeNutrition(item.ingredients, foods)
