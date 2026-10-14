@@ -87,7 +87,7 @@
               {{ dietStats.weightChange > 0 ? '+' : '' }}{{ dietStats.weightChange.toFixed(1) }} kg({{ dietStats.weightCount }} 次)
             </span>
           </div>
-          <div class="diet-note">目标按当前设置计算 · 跳过的餐不计入</div>
+          <div class="diet-note">目标按当前设置与近 7 天体重计算 · 跳过的餐不计入</div>
         </template>
         <div v-else class="diet-note">{{ trendRange === 'week' ? '本周' : '本月' }}还没有饮食记录</div>
       </div>

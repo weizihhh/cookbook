@@ -143,6 +143,7 @@
         :value="`${m.kcal} 千卡 · 蛋白 ${m.protein}g`"
       />
       <div class="hint">数值为公式估算,仅供参考;体重明显变化后请更新身体数据。</div>
+      <div class="hint">{{ effWeightInfo }}</div>
     </van-cell-group>
 
     <div style="margin: 16px 0">
@@ -206,6 +207,7 @@ import {
   EXCLUDE_TAGS,
   MEALS,
   calcTargets,
+  effectiveWeight,
 } from '../core/nutrition'
 import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
@@ -272,29 +274,28 @@ const fatPct = computed({
   },
 })
 
-// 预览目标(随表单实时变化)
-const previewTargets = ref(calcTargets(form))
-watch(
-  () => [
-    form.gender,
-    form.age,
-    form.height,
-    form.weight,
-    form.activity,
-    form.mode,
-    form.proteinPerKg,
-    form.fatRatio,
-    manualKcalInput.value,
-    splitInputs.value.join(','),
-  ],
-  () => {
-    previewTargets.value = calcTargets({
-      ...form,
-      manualKcal: manualKcalInput.value ? Number(manualKcalInput.value) : null,
-      mealSplit: normalizeSplit(),
-    })
-  }
+// 预览目标:随表单与近 7 天体重实时变化(热量/蛋白按有效体重半动态计算,与今日页口径一致)
+const previewTargets = computed(() =>
+  calcTargets({
+    ...form,
+    weight: effectiveWeight(form.weight, weight.recentAvg7),
+    manualKcal: manualKcalInput.value ? Number(manualKcalInput.value) : null,
+    mealSplit: normalizeSplit(),
+  })
 )
+
+// 半动态说明:让用户知道目标为何与"档案体重手算值"可能差一档
+const effWeightInfo = computed(() => {
+  const avg = weight.recentAvg7
+  if (avg == null) {
+    return '近 7 天无体重记录,目标按档案体重计算;在今日页记录体重后会自动半动态调整(每满 2kg 一档)。'
+  }
+  const eff = effectiveWeight(form.weight, avg)
+  if (eff === form.weight) {
+    return `近 7 天体重均值 ${avg.toFixed(1)}kg,与档案体重差不足 2kg,目标暂不调整。`
+  }
+  return `近 7 天体重均值 ${avg.toFixed(1)}kg,目标按有效体重 ${eff}kg 计算。增肌期体重上涨会同步上调热量,注意体脂变化。`
+})
 
 function normalizeSplit() {
   const nums = splitInputs.value.map((v) => Number(v) || 0)

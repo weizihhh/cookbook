@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { recentWeightAvg } from '../core/nutrition'
+import { todayStr } from '../utils/date'
 import { loadState, saveState } from '../utils/storage'
 
 const KEY = 'weight'
@@ -12,6 +14,8 @@ export const useWeightStore = defineStore('weight', {
 
   getters: {
     latest: (s) => (s.records.length ? s.records[s.records.length - 1] : null),
+    /** 近 7 日历日体重均值(窗口内无记录为 null)——热量目标半动态用 */
+    recentAvg7: (s) => recentWeightAvg(s.records, todayStr()),
     /** 与首次记录比较的变化(kg,负数=下降) */
     totalChange: (s) =>
       s.records.length >= 2 ? s.records[s.records.length - 1].kg - s.records[0].kg : 0,

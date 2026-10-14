@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { calcTargets } from '../core/nutrition'
+import { calcTargets, effectiveWeight } from '../core/nutrition'
+import { useWeightStore } from './weight'
 import { loadState, saveState } from '../utils/storage'
 
 const KEY = 'profile'
@@ -25,7 +26,11 @@ export const useProfileStore = defineStore('profile', {
 
   getters: {
     isConfigured: (s) => s.configured && s.weight > 0 && s.height > 0 && s.age > 0,
-    targets: (s) => calcTargets(s),
+    /** 目标半动态:热量/蛋白按"有效体重"算(近 7 天均值每满 2kg 调整,见 effectiveWeight) */
+    targets: (s) => {
+      const weightStore = useWeightStore()
+      return calcTargets({ ...s, weight: effectiveWeight(s.weight, weightStore.recentAvg7) })
+    },
   },
 
   actions: {

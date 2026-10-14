@@ -417,5 +417,17 @@ check('搜索:按名称命中(鸡胸→香煎鸡胸)', recipeMatchesKw(RECIPES_M
 check('搜索:无命中返回 false', recipeMatchesKw(RECIPES_MAP['r_boiled_egg'], '三文鱼', FOODS_MAP) === false)
 check('搜索:空关键词恒 true', recipeMatchesKw(RECIPES_MAP['r_boiled_egg'], '', FOODS_MAP) === true)
 
+// ---------- 19. 体重挂钩热量半动态 ----------
+const { recentWeightAvg, effectiveWeight } = await import('../src/core/nutrition.js')
+check('近7天均值:窗口内多条取均值', Math.abs(recentWeightAvg([{ date: '2026-10-13', kg: 70 }, { date: '2026-10-14', kg: 72 }], '2026-10-14') - 71) < 1e-9)
+check('近7天均值:窗口外记录不计入(8天前排除)', recentWeightAvg([{ date: '2026-10-07', kg: 80 }, { date: '2026-10-14', kg: 70 }], '2026-10-14') === 70)
+check('近7天均值:跨月窗口(9/28-10/4 起算)', Math.abs(recentWeightAvg([{ date: '2026-09-28', kg: 69 }, { date: '2026-10-04', kg: 71 }], '2026-10-04') - 70) < 1e-9)
+check('近7天均值:无记录返回 null', recentWeightAvg([], '2026-10-14') === null)
+check('有效体重:无近期记录用档案体重', effectiveWeight(70, null) === 70)
+check('有效体重:差不足2kg不调整', effectiveWeight(70, 71.9) === 70 && effectiveWeight(70, 68.1) === 70)
+check('有效体重:涨满2kg上调一档', effectiveWeight(70, 72) === 72)
+check('有效体重:降满2kg下调一档', effectiveWeight(70, 68) === 68)
+check('有效体重:朝档案体重保守(涨/降3.9只按2)', effectiveWeight(70, 73.9) === 72 && effectiveWeight(70, 66.1) === 68)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

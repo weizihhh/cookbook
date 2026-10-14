@@ -81,6 +81,29 @@ export function calcBMR({ gender, weight, height, age }) {
   return gender === 'male' ? base + 5 : base - 161
 }
 
+/** 近 N 个日历日内的体重均值(稀疏称重:窗口内无记录返回 null) */
+export function recentWeightAvg(records, today, days = 7) {
+  const [y, m, d] = today.split('-').map(Number)
+  const start = new Date(y, m - 1, d - (days - 1))
+  const p = (n) => String(n).padStart(2, '0')
+  const from = `${start.getFullYear()}-${p(start.getMonth() + 1)}-${p(start.getDate())}`
+  const inRange = records.filter((r) => r.date >= from && r.date <= today)
+  if (!inRange.length) return null
+  return inRange.reduce((s, r) => s + r.kg, 0) / inRange.length
+}
+
+/**
+ * 半动态计算体重:近 7 天均值相对档案体重每满 2kg 调整一档,
+ * 不足 2kg 不动(±1kg ≈ ±12-16 kcal/天,低于饮食记录误差,逐日微调只制造噪音);
+ * 取整朝档案体重方向保守(涨 3.9kg 按 +2 算,降 3.9kg 按 -2 算)。
+ * 热量与蛋白 g/kg 同步跟随该体重。无近期记录时用档案体重。
+ */
+export function effectiveWeight(profileWeight, recentAvg) {
+  if (!(recentAvg > 0)) return profileWeight
+  const steps = Math.trunc((recentAvg - profileWeight) / 2)
+  return profileWeight + steps * 2
+}
+
 export function calcTDEE(bmr, activity) {
   return bmr * activity
 }
