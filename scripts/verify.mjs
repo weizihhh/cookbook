@@ -500,5 +500,25 @@ const skipTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MA
 const allTotals = summarizeDay({ date: '2026-10-14', meals: skipDay }, FOODS_MAP, targets)
 check('summarizeDay 排除 skip 餐(288 → 144)', skipTotals.totals.kcal === 144 && allTotals.totals.kcal === 288, `got ${skipTotals.totals.kcal}/${allTotals.totals.kcal}`)
 
+// ---------- 22. v0.17.0 食部(edible)口径:克数=购买量,营养按可食部折算 ----------
+const clamN = computeNutrition([{ foodId: 'f_clam', grams: 300 }], FOODS_MAP)
+check('清汤蛤蜊 300g 带壳 → 可食 120g ≈ 12.1g 蛋白(评审验收口径)', Math.abs(clamN.protein - 12.1) < 0.1, `got ${clamN.protein}`)
+const wingN = computeNutrition([{ foodId: 'f_chicken_wing', grams: 150 }], FOODS_MAP)
+check('红烧鸡翅 150g 带骨(3个)→ 可食 103.5g ≈ 18.0g 蛋白', Math.abs(wingN.protein - 18.0) < 0.1, `got ${wingN.protein}`)
+check('鸡翅碳水修正为 4.6(官方第6版,曾误 1.5)', FOODS_MAP['f_chicken_wing'].carbs === 4.6)
+check('可食部显示:无单位(300g 蛤蜊)', formatFoodAmount(FOODS_MAP['f_clam'], 300) === '300g·约120g可食')
+check('可食部显示:单位型(3个鸡翅)', formatFoodAmount(FOODS_MAP['f_chicken_wing'], 150) === '3个(150g)·约103g可食')
+check('可食部显示:无食部食材不变', formatFoodAmount(FOODS_MAP['f_chicken_breast'], 150) === '150g')
+// 缩放同口径:带壳食材蛋白槽倒推按可食部折算,交付量应贴近目标(吸附/上限有少量舍入)
+const shrimpScaled = scaleRecipe(RECIPES_MAP['r_boiled_shrimp'], FOODS_MAP, { byProtein: 20 })
+const shrimpN = computeNutrition(shrimpScaled.ingredients, FOODS_MAP)
+check('带壳食材缩放同口径(20g 蛋白目标,交付 18-21g)', shrimpN.protein >= 18 && shrimpN.protein <= 21, `got ${shrimpN.protein}`)
+// 虾仁炒西兰花:250g 带壳 = 150g 虾仁,虾蛋白与旧全可食口径一致(27.3g)+ 西兰花 3.3g
+const shrimpB = computeNutrition(RECIPES_MAP['r_shrimp_broccoli'].ingredients, FOODS_MAP)
+check('虾仁炒西兰花 250g 带壳折算 ≈ 30.6g 蛋白(与旧口径等价)', Math.abs(shrimpB.protein - 30.6) < 0.1, `got ${shrimpB.protein}`)
+// 采购清单聚合的克数是购买量口径(将来恢复 UI 即"买多少")
+const shellList = buildShoppingList({ '2026-10-14': { lunch: [{ recipeId: 'r_clam_broth', slot: 'protein', ingredients: [{ foodId: 'f_clam', grams: 300, scalable: true }] }] } }, FOODS_MAP)
+check('采购清单输出购买量(300g 带壳蛤蜊)', shellList[0]?.grams === 300, JSON.stringify(shellList))
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

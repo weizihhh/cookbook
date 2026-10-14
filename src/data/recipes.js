@@ -428,11 +428,11 @@ const RAW_RECIPES = [
   {
     id: 'r_shrimp_broccoli', name: '虾仁炒西兰花', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood'],
     ingredients: [
-      { foodId: 'f_shrimp', grams: 150, scalable: true },
+      { foodId: 'f_shrimp', grams: 250, scalable: true },
       { foodId: 'f_broccoli', grams: 80, scalable: false },
       { foodId: 'f_olive_oil', grams: 5, scalable: false },
     ],
-    steps: ['虾仁开背去线,西兰花焯水1分钟', '少油快炒虾仁至变红,下西兰花同炒,加盐'],
+    steps: ['基围虾煮熟去壳取虾仁约150g,开背去线', '西兰花焯水1分钟', '少油快炒虾仁至变红,下西兰花同炒,加盐'],
   },
   {
     id: 'r_boiled_fish_slices', name: '水煮鱼片', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood', 'spicy'],
@@ -497,7 +497,7 @@ const RAW_RECIPES = [
       { foodId: 'f_oyster', grams: 200, scalable: true },
       { foodId: 'f_olive_oil', grams: 5, scalable: false },
     ],
-    steps: ['生蚝刷净撬开', '铺蒜蓉,水开后蒸5分钟', '淋少量生抽热油'],
+    steps: ['带壳生蚝刷净撬开取肉(用量按蚝肉计)', '铺蒜蓉,水开后蒸5分钟', '淋少量生抽热油'],
   },
   {
     id: 'r_crucian_tofu_soup', name: '鲫鱼豆腐汤', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['seafood', 'soy'],

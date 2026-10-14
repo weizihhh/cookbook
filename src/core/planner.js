@@ -36,13 +36,14 @@ const STAPLE_GRAMS_MAX = 300
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 const r1 = (v) => Math.round(v * 10) / 10
 
-/** 按 ingredients(含克数)累加营养 */
+/** 按 ingredients(含克数)累加营养。克数为购买量口径,带壳/带骨食材(edible<1)
+ *  先折算到可食部再乘每百克营养值 */
 export function computeNutrition(ingredients, foods) {
   const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   for (const ing of ingredients) {
     const f = foods[ing.foodId]
     if (!f) continue
-    const k = ing.grams / 100
+    const k = (ing.grams * (f.edible ?? 1)) / 100
     total.kcal += f.kcal * k
     total.protein += f.protein * k
     total.carbs += f.carbs * k
@@ -56,14 +57,15 @@ export function computeNutrition(ingredients, foods) {
   }
 }
 
-/** 食谱中可缩放部分的基准营养(固定食材不计入,缩放系数只由 scalable 部分决定) */
+/** 食谱中可缩放部分的基准营养(固定食材不计入,缩放系数只由 scalable 部分决定)。
+ *  与 computeNutrition 同口径:按可食部折算,否则带壳食材的缩放系数会错 */
 function scalableBase(recipe, foods) {
   const base = { kcal: 0, protein: 0 }
   for (const ing of recipe.ingredients) {
     if (!ing.scalable) continue
     const f = foods[ing.foodId]
     if (!f) continue
-    const k = ing.grams / 100
+    const k = (ing.grams * (f.edible ?? 1)) / 100
     base.kcal += f.kcal * k
     base.protein += f.protein * k
   }

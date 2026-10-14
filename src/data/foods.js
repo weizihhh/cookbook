@@ -2,6 +2,9 @@
 // 数值为每 100g 可食部分的近似值,以《中国食物成分表 标准版》第 6 版为基准
 // (经中国疾控中心营养与健康所食物营养成分查询平台逐条核对),与市售具体
 // 产品有差异,仅供规划参考。
+// edible(食部):市售每 1g 中可食部的比例,带壳贝类/整鱼/鸡翅/带棒玉米等 <1。
+// 食谱克数与采购清单均为"市场购买量"口径,营养计算按 grams × edible 折算
+// (官方牡蛎条目按蚝肉计食部 100%,故不标)。未标注 = 100% 可食。
 // 调味料(盐/生抽等)用量小不计入营养,写在食谱做法步骤中。
 
 export const FOOD_CATEGORIES = [
@@ -29,7 +32,7 @@ const RAW_FOODS = [
   { id: 'f_quinoa', name: '藜麦(干)', category: 'grain', kcal: 368, protein: 14.0, carbs: 64.0, fat: 6.0 },
   { id: 'f_whole_wheat_bread', name: '全麦面包', category: 'grain', kcal: 250, protein: 9.0, carbs: 45.0, fat: 4.0, unit: '片', unitGrams: 35 },
   { id: 'f_steamed_bun', name: '馒头', category: 'grain', kcal: 223, protein: 7.0, carbs: 47.0, fat: 1.1, unit: '个', unitGrams: 100 },
-  { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200 },
+  { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200, edible: 0.46 },
   { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 90, protein: 1.1, carbs: 21.3, fat: 0.2, unit: '个', unitGrams: 100 },
   { id: 'f_purple_potato', name: '紫薯', category: 'grain', kcal: 82, protein: 1.3, carbs: 18.5, fat: 0.2, unit: '个', unitGrams: 100 },
   { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2, unit: '个', unitGrams: 100 },
@@ -47,7 +50,7 @@ const RAW_FOODS = [
   // ---------- 畜禽肉 ----------
   { id: 'f_chicken_breast', name: '鸡胸肉', category: 'meat', kcal: 133, protein: 19.4, carbs: 2.5, fat: 5.0 },
   { id: 'f_chicken_leg', name: '鸡腿肉(去皮)', category: 'meat', kcal: 120, protein: 20.0, carbs: 0, fat: 4.0 },
-  { id: 'f_chicken_wing', name: '鸡翅', category: 'meat', kcal: 194, protein: 17.4, carbs: 1.5, fat: 11.8, unit: '个', unitGrams: 50 },
+  { id: 'f_chicken_wing', name: '鸡翅', category: 'meat', kcal: 194, protein: 17.4, carbs: 4.6, fat: 11.8, unit: '个', unitGrams: 50, edible: 0.69 },
   { id: 'f_beef_lean', name: '牛肉(瘦)', category: 'meat', kcal: 118, protein: 21.0, carbs: 1.0, fat: 3.5 },
   { id: 'f_beef_shank', name: '牛腱肉', category: 'meat', kcal: 98, protein: 20.0, carbs: 1.0, fat: 1.5 },
   { id: 'f_pork_loin', name: '猪里脊', category: 'meat', kcal: 155, protein: 20.2, carbs: 0.7, fat: 7.9 },
@@ -57,7 +60,7 @@ const RAW_FOODS = [
   { id: 'f_pork_liver', name: '猪肝', category: 'meat', kcal: 129, protein: 19.3, carbs: 4.0, fat: 3.5 },
   { id: 'f_chicken_liver', name: '鸡肝', category: 'meat', kcal: 121, protein: 16.6, carbs: 2.8, fat: 4.8 },
   { id: 'f_beef_brisket', name: '牛腩', category: 'meat', kcal: 332, protein: 17.1, carbs: 0, fat: 29.3 },
-  { id: 'f_pork_ribs', name: '猪肋排', category: 'meat', kcal: 270, protein: 17.0, carbs: 0.7, fat: 21.0 },
+  { id: 'f_pork_ribs', name: '猪肋排', category: 'meat', kcal: 270, protein: 17.0, carbs: 0.7, fat: 21.0, edible: 0.72 },
   { id: 'f_beef_tenderloin', name: '牛里脊', category: 'meat', kcal: 113, protein: 22.0, carbs: 1.0, fat: 3.0 },
   { id: 'f_rabbit', name: '兔肉', category: 'meat', kcal: 102, protein: 19.7, carbs: 0.9, fat: 2.2 },
 
@@ -67,14 +70,14 @@ const RAW_FOODS = [
   { id: 'f_bass', name: '鲈鱼', category: 'seafood', kcal: 105, protein: 18.6, carbs: 0, fat: 3.4 },
   { id: 'f_basa', name: '龙利鱼', category: 'seafood', kcal: 90, protein: 17.0, carbs: 0, fat: 2.0 },
   { id: 'f_hairtail', name: '带鱼', category: 'seafood', kcal: 127, protein: 17.7, carbs: 3.1, fat: 4.9 },
-  { id: 'f_shrimp', name: '基围虾', category: 'seafood', kcal: 101, protein: 18.2, carbs: 3.9, fat: 1.4, unit: '只', unitGrams: 10 },
+  { id: 'f_shrimp', name: '基围虾', category: 'seafood', kcal: 101, protein: 18.2, carbs: 3.9, fat: 1.4, unit: '只', unitGrams: 10, edible: 0.60 },
   { id: 'f_squid', name: '鱿鱼', category: 'seafood', kcal: 84, protein: 17.4, carbs: 0, fat: 1.6 },
-  { id: 'f_clam', name: '蛤蜊', category: 'seafood', kcal: 62, protein: 10.1, carbs: 2.8, fat: 1.1 },
+  { id: 'f_clam', name: '蛤蜊', category: 'seafood', kcal: 62, protein: 10.1, carbs: 2.8, fat: 1.1, edible: 0.40 },
   { id: 'f_tuna_canned', name: '金枪鱼(水浸)', category: 'seafood', kcal: 108, protein: 24.0, carbs: 0, fat: 1.0 },
   { id: 'f_dried_small_shrimp', name: '虾皮', category: 'seafood', kcal: 153, protein: 30.7, carbs: 2.5, fat: 2.2 },
-  { id: 'f_razor_clam', name: '蛏子', category: 'seafood', kcal: 40, protein: 7.3, carbs: 2.1, fat: 0.3 },
+  { id: 'f_razor_clam', name: '蛏子', category: 'seafood', kcal: 40, protein: 7.3, carbs: 2.1, fat: 0.3, edible: 0.57 },
   { id: 'f_oyster', name: '生蚝', category: 'seafood', kcal: 73, protein: 5.3, carbs: 8.2, fat: 2.1 },
-  { id: 'f_crucian', name: '鲫鱼', category: 'seafood', kcal: 108, protein: 17.1, carbs: 3.8, fat: 2.7 },
+  { id: 'f_crucian', name: '鲫鱼', category: 'seafood', kcal: 108, protein: 17.1, carbs: 3.8, fat: 2.7, edible: 0.54 },
   { id: 'f_scallop', name: '扇贝', category: 'seafood', kcal: 60, protein: 11.1, carbs: 2.6, fat: 0.6 },
   { id: 'f_pomfret', name: '鲳鱼', category: 'seafood', kcal: 140, protein: 18.5, carbs: 0, fat: 7.0 },
 
@@ -219,18 +222,21 @@ export const FOODS = RAW_FOODS.map((f) => ({ ...f, antiInfl: ANTI_INFLAMMATORY_I
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
 
 /** 生活化显示:有单位的食材显示"3个(150g)",否则"150g"
- *  小单位(<100g/个)取整(生成端已吸附到整数倍);大单位保留 1 位小数(整数倍跳跃过大) */
+ *  小单位(<100g/个)取整(生成端已吸附到整数倍);大单位保留 1 位小数(整数倍跳跃过大)
+ *  带壳/带骨食材(edible<1)追加可食部换算,让"买多少/吃多少营养"对用户透明 */
 export function formatFoodAmount(food, grams) {
   const g = Math.round(grams)
+  const edibleNote =
+    food?.edible && food.edible < 1 ? `·约${Math.round(grams * food.edible)}g可食` : ''
   if (food?.unit && food?.unitGrams > 0) {
     const n = grams / food.unitGrams
     const count =
       food.unitGrams < 100
         ? String(Math.max(1, Math.round(n)))
         : String(Math.round(n * 10) / 10)
-    return `${count}${food.unit}(${g}g)`
+    return `${count}${food.unit}(${g}g)${edibleNote}`
   }
-  return `${g}g`
+  return `${g}g${edibleNote}`
 }
 
 /** 小单位(<100g/个)克数吸附到整数倍,避免"3袋(100g)"这类袋数与克数不自洽的用量;
