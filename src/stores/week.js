@@ -109,6 +109,20 @@ export const useWeekStore = defineStore('week', {
       delete this.days[date]
       this.persist()
     },
+    /** 清除某天的餐但保留指定餐(已打卡"已吃"视为锁定),返回被清的餐数 */
+    clearDayExcept(date, keepMealKeys) {
+      const meals = this.days[date]
+      if (!meals) return 0
+      const keep = new Set(keepMealKeys)
+      let cleared = 0
+      for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+        if (keep.has(mealKey)) continue
+        if (meals[mealKey]?.length) cleared++
+        meals[mealKey] = []
+      }
+      this.persist()
+      return cleared
+    },
     // ---- 自定义编辑:添加/移除菜品、改克数(记录实际进食) ----
     /** 添加菜品(基准份;同餐已有同食谱则克数累加) */
     addItem(date, mealKey, recipeId) {

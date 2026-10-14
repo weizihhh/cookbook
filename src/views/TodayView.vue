@@ -350,7 +350,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { showToast } from 'vant'
+import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
 import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
@@ -509,8 +509,40 @@ function generate() {
   week.generateDay(today)
   showToast('已生成')
 }
-function clearToday() {
-  week.clearDay(today)
+// 清空:已打卡"已吃"的餐视为锁定——先问是否一并清;取消则保留已吃的餐,只清其余。
+// 清掉的餐同步清打卡标记,避免"已吃/跳过"tag 悬挂在空餐上。
+async function clearToday() {
+  const locked = MEALS.filter((m) => checkin.statusOf(today, m.key) === 'done')
+  if (!locked.length) {
+    week.clearDay(today)
+    for (const m of MEALS) checkin.mark(today, m.key, null)
+    showToast('已清空')
+    return
+  }
+  const names = locked.map((m) => m.label).join('、')
+  let clearAll = false
+  try {
+    await showConfirmDialog({
+      title: `${names}已打卡"已吃"`,
+      message: '已吃的餐视为已锁定。要连同这些记录一并清空吗?取消则保留已吃的餐,只清空其余。',
+      confirmButtonText: '一并清空',
+      cancelButtonText: '保留已吃',
+    })
+    clearAll = true
+  } catch {
+    clearAll = false
+  }
+  if (clearAll) {
+    week.clearDay(today)
+    for (const m of MEALS) checkin.mark(today, m.key, null)
+    showToast('已清空')
+  } else {
+    week.clearDayExcept(today, locked.map((m) => m.key))
+    for (const m of MEALS) {
+      if (checkin.statusOf(today, m.key) !== 'done') checkin.mark(today, m.key, null)
+    }
+    showToast(`已清空,保留已吃的${names}`)
+  }
 }
 function mealItems(mealKey) {
   return todayMeals.value?.[mealKey] || []
