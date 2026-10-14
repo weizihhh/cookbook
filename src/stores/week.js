@@ -84,14 +84,20 @@ export const useWeekStore = defineStore('week', {
       }
       return out
     },
-    /** 换掉某天某餐某槽位的菜,无可用候选时返回 false */
-    swap(date, mealKey, slot) {
+    /** 换掉某天某餐某槽位的菜,无可用候选时返回 false。
+     *  index 指定要换的条目下标(详情层打开的具体菜品;同餐可能有多个同槽条目);
+     *  缺省或下标与槽位不符时按槽位找第一个 */
+    swap(date, mealKey, slot, index = -1) {
       const meals = this.days[date]
       if (!meals) return false
       const profile = useProfileStore()
-      const idx = meals[mealKey].findIndex((it) => it && it.slot === slot)
+      const list = meals[mealKey]
+      let idx = index
+      if (idx < 0 || !list[idx] || list[idx].slot !== slot) {
+        idx = list.findIndex((it) => it && it.slot === slot)
+      }
       if (idx < 0) return false
-      const current = meals[mealKey][idx]
+      const current = list[idx]
       const usedIds = new Set(
         Object.values(this.days)
           .flat()

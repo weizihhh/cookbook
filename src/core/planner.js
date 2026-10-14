@@ -6,6 +6,7 @@
 // - 缩放 = 对食谱基准配比乘系数 s(scalable 食材才乘,s 限制在 [0.3, 3] 防离谱)
 
 import { addDays } from '../utils/date.js'
+import { snapGramsToUnit } from '../data/foods.js'
 
 export const MEAL_TEMPLATES = {
   breakfast: ['staple', 'protein', 'fruit'],
@@ -88,13 +89,11 @@ export function scaleRecipe(recipe, foods, { byProtein = null, byKcal = null, ma
   const ingredients = recipe.ingredients.map((ing) => {
     if (!ing.scalable) return { ...ing }
     const f = foods[ing.foodId]
-    let grams = ing.grams * s
-    if (f?.unit && f.unitGrams > 0 && f.unitGrams < 100) {
-      // 小单位食材(<100g/个)吸附到整数倍,避免"3.5个鸡蛋"这类不可操作用量
-      grams = Math.max(f.unitGrams, Math.round(grams / f.unitGrams) * f.unitGrams)
-    } else {
-      grams = clamp(grams, GRAMS_MIN, GRAMS_MAX)
-    }
+    const isSmallUnit = f?.unit && f.unitGrams > 0 && f.unitGrams < 100
+    // 小单位食材吸附到整数倍(与显示/步进对齐),其余走绝对克数边界
+    const grams = isSmallUnit
+      ? snapGramsToUnit(f, ing.grams * s)
+      : clamp(ing.grams * s, GRAMS_MIN, GRAMS_MAX)
     return { foodId: ing.foodId, grams: Math.round(grams), scalable: ing.scalable }
   })
   return { recipeId: recipe.id, slot: recipe.slot, ingredients, scale: r1(s) }
@@ -108,6 +107,16 @@ export function filterCandidates(recipes, { slot, meal, excludedTags = [] }) {
       r.mealFit.includes(meal) &&
       r.tags.every((t) => !excludedTags.includes(t))
   )
+}
+
+/** 搜索关键词匹配食谱:命中名称或所含食材名(搜"鸡蛋"能命中"水煮蛋") */
+export function recipeMatchesKw(recipe, kw, foods) {
+  if (!kw) return true
+  if (recipe.name.includes(kw)) return true
+  return recipe.ingredients.some((ing) => {
+    const name = foods[ing.foodId]?.name
+    return name ? name.includes(kw) : false
+  })
 }
 
 function pickFrom(candidates, usedIds, recentIds = []) {

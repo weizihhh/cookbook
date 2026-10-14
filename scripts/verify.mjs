@@ -400,5 +400,22 @@ check(
 )
 check('复制条目保留 recipeId/slot/custom 标记', copiedMeal[0].recipeId === 'r_boiled_egg' && copiedMeal[0].slot === 'protein')
 
+// ---------- 18. v0.15.4 修复回归 ----------
+// 单位吸附共享规则:小单位非整数倍克数吸附到最近整数倍(生成缩放与手动添加共用),
+// 大单位/无单位原样返回(大单位走 1 位小数显示路线)
+const { snapGramsToUnit } = await import('../src/data/foods.js')
+const cfBag = { unit: '袋', unitGrams: 30 }
+check('吸附:100g/袋30g → 90g(3袋,显示与克数自洽)', snapGramsToUnit(cfBag, 100) === 90)
+check('吸附:已整数倍不变(150g/个50g)', snapGramsToUnit(FOODS_MAP['f_egg'], 150) === 150)
+check('吸附:大单位原样返回(350g/杯250g)', snapGramsToUnit(FOODS_MAP['f_milk'], 350) === 350)
+check('吸附:无单位原样返回', snapGramsToUnit(FOODS_MAP['f_chicken_breast'], 137) === 137)
+
+// 搜索关键词:命中食谱名或所含食材名(搜"鸡蛋"能命中"水煮蛋")
+const { recipeMatchesKw } = await import('../src/core/planner.js')
+check('搜索:按食材名命中(鸡蛋→水煮蛋)', recipeMatchesKw(RECIPES_MAP['r_boiled_egg'], '鸡蛋', FOODS_MAP) === true)
+check('搜索:按名称命中(鸡胸→香煎鸡胸)', recipeMatchesKw(RECIPES_MAP['r_pan_fried_chicken'], '鸡胸', FOODS_MAP) === true)
+check('搜索:无命中返回 false', recipeMatchesKw(RECIPES_MAP['r_boiled_egg'], '三文鱼', FOODS_MAP) === false)
+check('搜索:空关键词恒 true', recipeMatchesKw(RECIPES_MAP['r_boiled_egg'], '', FOODS_MAP) === true)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

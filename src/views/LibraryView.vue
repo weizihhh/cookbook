@@ -235,7 +235,7 @@ import { ref, reactive, computed } from 'vue'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
 import { RECIPES } from '../data/recipes'
 import { FOODS, FOODS_MAP, FOOD_CATEGORIES, formatFoodAmount } from '../data/foods'
-import { SLOT_LABELS, computeNutrition } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, recipeMatchesKw } from '../core/planner'
 import { EXCLUDE_TAGS } from '../core/nutrition'
 import { parseNutritionLabel, normalizeTo100g } from '../core/labelScan'
 import { scanImageText } from '../utils/ocr'
@@ -253,10 +253,10 @@ const slots = [
 const activeTab = ref(0)
 const searchKw = ref('')
 
-// 搜索时放开槽位筛选,全库(含自定义食物)按名称匹配
+// 搜索时放开槽位筛选,全库(含自定义食物)按名称或所含食材名匹配
 function recipesOf(slot) {
   const kw = searchKw.value.trim()
-  if (kw) return allLibraryRecipes.value.filter((r) => r.name.includes(kw))
+  if (kw) return allLibraryRecipes.value.filter((r) => recipeMatchesKw(r, kw, FOODS_MAP))
   if (slot === 'all') return RECIPES
   if (slot === 'anti') return RECIPES.filter((r) => r.antiInfl)
   return RECIPES.filter((r) => r.slot === slot)

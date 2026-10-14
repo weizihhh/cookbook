@@ -231,3 +231,12 @@ export function formatFoodAmount(food, grams) {
   }
   return `${g}g`
 }
+
+/** 小单位(<100g/个)克数吸附到整数倍,避免"3袋(100g)"这类袋数与克数不自洽的用量;
+ *  生成缩放(scaleRecipe)与手动添加确认层(doAdd)共用此规则。大单位/无单位原样返回 */
+export function snapGramsToUnit(food, grams) {
+  if (food?.unit && food.unitGrams > 0 && food.unitGrams < 100) {
+    return Math.max(food.unitGrams, Math.round(grams / food.unitGrams) * food.unitGrams)
+  }
+  return grams
+}

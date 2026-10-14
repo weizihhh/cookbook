@@ -371,8 +371,8 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition } from '../core/planner'
-import { FOODS_MAP, formatFoodAmount } from '../data/foods'
+import { SLOT_LABELS, computeNutrition, recipeMatchesKw } from '../core/planner'
+import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
@@ -699,7 +699,7 @@ function openDetail(mealKey, index) {
 }
 
 function doSwap() {
-  const ok = week.swap(today, detailMealKey.value, detailItem.value.slot)
+  const ok = week.swap(today, detailMealKey.value, detailItem.value.slot, detailIndex.value)
   if (!ok) {
     showToast('没有其他可用的候选了')
     return
@@ -763,7 +763,7 @@ function filteredAddRecipes(slot) {
     (r) =>
       (slot === 'all' || r.slot === slot) &&
       (kw ? true : r.mealFit.includes(addMealKey.value)) &&
-      (!kw || r.name.includes(kw))
+      (!kw || recipeMatchesKw(r, kw, FOODS_MAP))
   )
 }
 
@@ -774,11 +774,16 @@ function baseKcal(recipe) {
 }
 
 function doAdd(recipe) {
-  // 打开确认弹层:先调整克数(个数型按"个"),再确认入餐
+  // 打开确认弹层:先调整克数(个数型按"个"),再确认入餐。
+  // 可缩放的小单位食材基准份吸附到整数倍(与生成端同规则):
+  // 自定义食物基准 100g/袋30g 这类非整数倍,不吸附会出现"3袋(100g)"的袋数克数不自洽
   addDraft.value = {
     recipeId: recipe.id,
     slot: recipe.slot,
-    ingredients: recipe.ingredients.map((ing) => ({ ...ing })),
+    ingredients: recipe.ingredients.map((ing) => ({
+      ...ing,
+      grams: ing.scalable ? Math.round(snapGramsToUnit(FOODS_MAP[ing.foodId], ing.grams)) : ing.grams,
+    })),
   }
   addShow.value = false
   addConfirmShow.value = true
