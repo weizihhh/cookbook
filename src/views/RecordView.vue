@@ -77,7 +77,10 @@
             :class="{ disabled: !canPrev }"
             @click="prevMonth"
           />
-          <span class="cal-title">{{ calYear }}年{{ calMonth + 1 }}月</span>
+          <span class="cal-title" @click="openMonthPicker">
+            {{ calYear }}年{{ calMonth + 1 }}月
+            <van-icon name="arrow-down" class="cal-title-arrow" />
+          </span>
           <van-icon
             name="arrow-right"
             class="cal-nav"
@@ -109,6 +112,17 @@
           <span class="cal-today-btn" @click="goToday">回到今天</span>
         </div>
       </div>
+
+      <!-- 年月跳转 -->
+      <van-popup v-model:show="showMonthPicker" position="bottom" round>
+        <van-picker
+          v-model="pickerValues"
+          title="选择月份"
+          :columns="pickerColumns"
+          @confirm="onMonthConfirm"
+          @cancel="showMonthPicker = false"
+        />
+      </van-popup>
       <!-- 选中日的食谱 -->
       <div v-if="selected" class="day-detail">
         <div class="detail-head">
@@ -273,11 +287,11 @@ const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
 const now = new Date()
 const calYear = ref(now.getFullYear())
 const calMonth = ref(now.getMonth())
-// 可翻范围:最早一年前同月,最晚当前月(未来月无记录意义)
+// 可翻范围:最早一年前同月,最晚当前月往后一年(未来天置灰,仅可浏览)
 const minYM = (now.getFullYear() - 1) * 12 + now.getMonth()
-const curYM = now.getFullYear() * 12 + now.getMonth()
+const maxYM = (now.getFullYear() + 1) * 12 + now.getMonth()
 const canPrev = computed(() => calYear.value * 12 + calMonth.value > minYM)
-const canNext = computed(() => calYear.value * 12 + calMonth.value < curYM)
+const canNext = computed(() => calYear.value * 12 + calMonth.value < maxYM)
 function prevMonth() {
   if (!canPrev.value) return
   if (calMonth.value === 0) {
@@ -300,6 +314,31 @@ function goToday() {
   calYear.value = now.getFullYear()
   calMonth.value = now.getMonth()
   selected.value = today
+}
+
+// ---- 年月跳转 ----
+const showMonthPicker = ref(false)
+const pickerValues = ref([now.getFullYear(), now.getMonth()])
+const pickerColumns = computed(() => {
+  const minYear = now.getFullYear() - 1
+  const maxYear = now.getFullYear() + 1
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => ({
+    text: `${minYear + i}年`,
+    value: minYear + i,
+  }))
+  const months = Array.from({ length: 12 }, (_, i) => ({ text: `${i + 1}月`, value: i }))
+  return [years, months]
+})
+function openMonthPicker() {
+  pickerValues.value = [calYear.value, calMonth.value]
+  showMonthPicker.value = true
+}
+function onMonthConfirm({ selectedValues }) {
+  // 夹回可翻范围内
+  const ym = Math.min(maxYM, Math.max(minYM, selectedValues[0] * 12 + selectedValues[1]))
+  calYear.value = Math.floor(ym / 12)
+  calMonth.value = ym % 12
+  showMonthPicker.value = false
 }
 const monthCells = computed(() => {
   const y = calYear.value
@@ -413,6 +452,12 @@ async function confirmClear(date) {
   font-size: 15px;
   font-weight: 600;
   color: #323233;
+  cursor: pointer;
+}
+.cal-title-arrow {
+  font-size: 12px;
+  color: #969799;
+  vertical-align: -1px;
 }
 .cal-nav {
   font-size: 18px;
