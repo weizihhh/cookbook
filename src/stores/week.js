@@ -41,8 +41,10 @@ export const useWeekStore = defineStore('week', {
     hasDay(date) {
       return !!this.days[date]
     },
-    /** 生成单日(今日页"生成今日三餐"用);有历史记录时优先从最近吃过的菜中组装。
-     *  keepMealKeys:不参与重新生成的餐(已打卡"已吃"视为锁定,内容是既成记录) */
+    /** 生成单日(今日页"生成今日三餐"用)。
+     *  keepMealKeys:不参与重新生成的餐(已打卡"已吃"视为锁定,内容是既成记录)。
+     *  v0.16.1 起不再带"最近吃过"偏好:独占式偏好让单调饮食者每次生成都复现
+     *  同一批菜(且生成结果写回当天又会自我强化),"熟悉"的入口是添加弹层的最近 chips */
     generateDay(date, keepMealKeys = []) {
       const profile = useProfileStore()
       this.syncWeekOf(date)
@@ -53,7 +55,6 @@ export const useWeekStore = defineStore('week', {
         targets: profile.targets,
         excludedTags: profile.excludedTags,
         date,
-        recentIds: this.recentRecipeIds(date),
       }).meals
       const keep = new Set(keepMealKeys)
       for (const mealKey of keep) {
