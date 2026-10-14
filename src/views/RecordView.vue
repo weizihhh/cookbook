@@ -115,7 +115,7 @@
             <van-icon name="arrow-down" class="cal-title-arrow" />
           </span>
           <van-icon
-            name="arrow-right"
+            name="arrow"
             class="cal-nav"
             :class="{ disabled: !canNext }"
             @click="nextMonth"
