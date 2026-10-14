@@ -516,9 +516,37 @@ const remainingText = computed(() => {
   return r >= 0 ? `还可摄入 ${r} 千卡` : `已超 ${-r} 千卡`
 })
 
-function generate() {
-  week.generateDay(today)
-  showToast('已生成')
+// 重新生成:已打卡"已吃"的餐视为锁定(与清空保护同语义)——先问是否一并重生成;
+// 被重新生成的餐同步清打卡标记,避免"已吃/跳过"悬挂到新内容上
+async function generate() {
+  const locked = MEALS.filter((m) => checkin.statusOf(today, m.key) === 'done')
+  if (!locked.length) {
+    regen([])
+    return
+  }
+  const names = locked.map((m) => m.label).join('、')
+  let regenAll = false
+  try {
+    await showConfirmDialog({
+      title: `${names}已打卡"已吃"`,
+      message: '已吃的餐是既成记录。要重新生成这些内容吗?取消则保留已吃的餐,只重新生成其余。',
+      confirmButtonText: '全部重新生成',
+      cancelButtonText: '保留已吃',
+    })
+    regenAll = true
+  } catch {
+    regenAll = false
+  }
+  regen(regenAll ? [] : locked.map((m) => m.key), regenAll ? '' : names)
+}
+
+function regen(keepMealKeys, lockedNames = '') {
+  week.generateDay(today, keepMealKeys)
+  const keep = new Set(keepMealKeys)
+  for (const m of MEALS) {
+    if (!keep.has(m.key)) checkin.mark(today, m.key, null)
+  }
+  showToast(lockedNames ? `已重新生成,保留已吃的${lockedNames}` : '已生成')
 }
 // 清空:已打卡"已吃"的餐视为锁定——先问是否一并清;取消则保留已吃的餐,只清其余。
 // 清掉的餐同步清打卡标记,避免"已吃/跳过"tag 悬挂在空餐上。
