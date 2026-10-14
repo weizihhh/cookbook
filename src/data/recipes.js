@@ -129,14 +129,14 @@ const RAW_RECIPES = [
     id: 'r_oat_banana_bowl', name: '燕麦香蕉碗', slot: 'staple', mealFit: ['breakfast'], tags: ['gluten'],
     ingredients: [
       { foodId: 'f_oats', grams: 40, scalable: true },
-      { foodId: 'f_banana', grams: 100, scalable: false },
+      { foodId: 'f_banana', grams: 120, scalable: false },
     ],
     steps: ['燕麦加热水或牛奶泡5分钟', '香蕉切片铺上'],
   },
   {
     id: 'r_sweet_potato_porridge', name: '红薯粥', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
     ingredients: [
-      { foodId: 'f_sweet_potato', grams: 150, scalable: true },
+      { foodId: 'f_sweet_potato', grams: 100, scalable: true },
       { foodId: 'f_rice', grams: 25, scalable: true },
     ],
     steps: ['红薯去皮切块', '与大米加水煮25分钟'],
@@ -195,7 +195,7 @@ const RAW_RECIPES = [
   },
   {
     id: 'r_mashed_potato', name: '土豆泥', slot: 'staple', mealFit: ['lunch', 'dinner'], tags: [],
-    ingredients: [{ foodId: 'f_potato', grams: 250, scalable: true }],
+    ingredients: [{ foodId: 'f_potato', grams: 200, scalable: true }],
     steps: ['土豆去皮切块蒸20分钟', '压成泥,加少量牛奶、盐、黑胡椒拌匀'],
   },
   {
@@ -240,7 +240,7 @@ const RAW_RECIPES = [
   },
   {
     id: 'r_soy_milk_cup', name: '无糖豆浆', slot: 'protein', mealFit: ['breakfast'], tags: ['soy'],
-    ingredients: [{ foodId: 'f_soy_milk', grams: 300, scalable: true }],
+    ingredients: [{ foodId: 'f_soy_milk', grams: 250, scalable: true }],
     steps: ['豆浆机或市售无糖豆浆,温热饮用'],
   },
   {

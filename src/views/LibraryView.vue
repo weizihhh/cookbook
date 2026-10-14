@@ -132,7 +132,7 @@
           v-for="ing in current.ingredients"
           :key="ing.foodId"
           :title="FOODS_MAP[ing.foodId]?.name + (ing.scalable ? '(可缩放)' : '')"
-          :value="ing.grams + 'g'"
+          :value="formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams)"
         />
         <template v-if="current.steps?.length">
           <van-cell title="做法" />
@@ -234,7 +234,7 @@
 import { ref, reactive, computed } from 'vue'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
 import { RECIPES } from '../data/recipes'
-import { FOODS, FOODS_MAP, FOOD_CATEGORIES } from '../data/foods'
+import { FOODS, FOODS_MAP, FOOD_CATEGORIES, formatFoodAmount } from '../data/foods'
 import { SLOT_LABELS, computeNutrition } from '../core/planner'
 import { EXCLUDE_TAGS } from '../core/nutrition'
 import { parseNutritionLabel, normalizeTo100g } from '../core/labelScan'

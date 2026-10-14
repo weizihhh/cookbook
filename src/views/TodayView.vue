@@ -189,7 +189,7 @@
             {{ FOODS_MAP[ing.foodId]?.name }}
             <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
           </template>
-          <template #label>{{ ing.grams }}g</template>
+          <template #label>{{ formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams) }}</template>
           <template #value>
             <!-- 个数型食材按"个"步进,其余按 5g 步进 -->
             <van-stepper
@@ -298,7 +298,7 @@
             {{ FOODS_MAP[ing.foodId]?.name }}
             <span v-if="unitOf(ing.foodId)" class="unit-hint">({{ unitOf(ing.foodId) }})</span>
           </template>
-          <template #label>{{ ing.grams }}g</template>
+          <template #label>{{ formatFoodAmount(FOODS_MAP[ing.foodId], ing.grams) }}</template>
           <template #value>
             <van-stepper
               v-if="unitOf(ing.foodId)"
