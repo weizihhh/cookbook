@@ -113,3 +113,25 @@ scripts/verify.mjs  原样保留,不动
 | CI | 单人本地项目,无远端托管诉求,纯成本 |
 | OCR 真识别纳入自动化 | 语言包 CDN + 识别质量随机,无法可靠断言;解析纯函数已有覆盖 |
 | 全场景精确断言 | 成本翻倍,流程场景精确断言无增量价值 |
+
+## 10. P1 落地记录(2026-10-15,v0.24.0)
+
+**交付:** `npm test` 四段聚合全绿——verify 160 + vitest 31(week store)+ Playwright 功能 E2E 16(场景 8 拆 8a/8b 两分支、13+14 合为一条备份链路)+ PWA 1。
+
+**环境事实(换机重装必读):**
+- jsdom 锁 **26**(27 的依赖 @asamuzakjp/css-color CJS 构建 require 纯 ESM 的 @csstools/css-calc,Node 20 不支持 require(esm),上游打包 bug)
+- Chromium 下载:官方 CDN 国内不可达(ECONNRESET/超时),需 `PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/ npx playwright install chromium`
+- 残留的 vite preview 可能占用 4173(测试前 `netstat -ano | grep 4173` 探查,杀 PID)
+
+**E2E 实现要点(复用时直接套):**
+- Vant `#title` 插槽渲染为 cell-group 的**兄弟节点**:餐次卡 body 用"标题节点之后第一个 inset 兄弟"定位(helpers.mealCard),头部/打卡 tag 用标题节点本身(helpers.mealHeader)
+- `addInitScript` 每次导航(含应用自行 reload)重跑:注入必须带按调用序号的幂等哨兵(`__e2e_inj_N`,非 cookbook: 前缀不进备份),否则"恢复默认/导入"类 reload 场景被重注入污染
+- 应用自行 reload 会把 URL 重载回当前路由、盖掉外部 hash 导航:reload 前在 window 设标记,`waitForFunction` 等标记消失再 goto
+- `locator({ hasText })` 无 exact 语义(子串匹配),"添加"会撞"+ 添加菜品"——精确按钮用 `getByRole('button', { name, exact: true })`
+- 弹层关闭有 ~300ms 过渡,关闭后立刻做 DOM 计数(toHaveCount)会命中残留节点——可见性断言用 toBeVisible/toBeHidden 自动过滤
+
+**已知测试边界:**
+- 场景 12"点昨天"假设昨天在当前显示月,跨月首日(每月 1 号)跑会失败——届时先修该步或跳过
+
+**P1 期发现 bug 清单(只测不修,待用户拍板):**
+- **B-1(体验级)**:恢复默认后页面 reload 回 /#/profile,ProfileView 自动保存 watch 立即触发 `profile.update()`,configured 被写回 true → 引导态不再出现(数据确已全清,无数据风险)。backup.spec 相应断言已移到 localStorage 层;修复后应恢复引导态 UI 断言。

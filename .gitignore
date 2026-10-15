@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.local
 .DS_Store
+
+# 测试产物(Playwright trace/截图/报告)
+test-results/
+playwright-report/
