@@ -92,6 +92,23 @@
         <div v-else class="diet-note">{{ trendRange === 'week' ? '本周' : '本月' }}还没有饮食记录</div>
       </div>
 
+      <!-- 食材多样性:发现型指标,固定近 7 天滚动窗(不随周/月切换变口径) -->
+      <template v-if="diversity.total">
+        <div class="stat-divider"></div>
+        <div class="diet-stats">
+          <div class="diet-row">
+            <span class="diet-label">食材多样性</span>
+            <span class="diet-val">
+              近 7 天 <b>{{ diversity.total }}</b> 种 · 蔬菜 {{ diversity.vegetables }} 种
+              <i :class="diversity.total >= 25 ? 'ok' : 'under'">
+                {{ diversity.total >= 25 ? '达标 ✓' : `还差 ${25 - diversity.total} 种` }}
+              </i>
+            </span>
+          </div>
+          <div class="diet-note">膳食指南建议:平均每天不重样 ≥12 种、每周 ≥25 种食材</div>
+        </div>
+      </template>
+
       <!-- 目标进度:减脂双轨预测 / 增肌增速对照;维持模式不渲染 -->
       <template v-if="progressInfo">
         <div class="stat-divider"></div>
@@ -156,6 +173,7 @@
               empty: !d,
               today: d === today,
               'has-rec': d && d <= today && recordDateSet.has(d),
+              [recClass(d)]: d && d <= today && recordDateSet.has(d),
               selected: d === selected,
               future: d > today,
             }"
@@ -163,6 +181,11 @@
           >
             <span v-if="d" class="cal-num">{{ Number(d.slice(8, 10)) }}</span>
           </div>
+        </div>
+        <div class="cal-legend">
+          <span><i class="dot ok"></i>达标</span>
+          <span><i class="dot over"></i>超标</span>
+          <span><i class="dot under"></i>偏低</span>
         </div>
         <div class="cal-foot">
           <span class="cal-today-btn" @click="goToday">回到今天</span>
@@ -228,7 +251,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, theoryProgress, measuredWeeklyRate } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeIntake } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake, foodDiversity } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useWeekStore } from '../stores/week'
@@ -443,6 +466,27 @@ const recordDays = computed(() => {
 })
 
 const recordDateSet = computed(() => new Set(recordDays.value.map((d) => d.date)))
+
+// 日历格三色:已吃口径(跳过不计)的热量对照当日目标,±10% 达标——与统计/今日页同一口径。
+// recordDays 只收有菜品的天,每个记录日必有状态
+const dayStatusMap = computed(() => {
+  const map = new Map()
+  const tg = profile.targets.kcal
+  if (tg <= 0) return map
+  for (const day of recordDays.value) {
+    const skipped = MEALS.filter((m) => checkin.statusOf(day.date, m.key) === 'skip').map((m) => m.key)
+    const kcal = summarizeIntake({ date: day.date, meals: day.meals }, FOODS_MAP, profile.targets, skipped).totals.kcal
+    const d = Math.round(((kcal - tg) / tg) * 100)
+    map.set(day.date, Math.abs(d) <= 10 ? 'ok' : d > 0 ? 'over' : 'under')
+  }
+  return map
+})
+function recClass(d) {
+  return `rec-${dayStatusMap.value.get(d) || 'ok'}`
+}
+
+// 食材多样性:近 7 天滚动窗(与频次约束同窗口)。指南建议平均每天 ≥12 种、每周 ≥25 种
+const diversity = computed(() => foodDiversity(week.days, today.value, FOODS_MAP))
 
 // ---- 翻页月历 ----
 const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
@@ -739,6 +783,38 @@ async function confirmClear(date) {
 }
 .cal-cell.selected.has-rec::after {
   background: #fff;
+}
+/* 三色热力:达标绿为默认,超标红/偏低橙覆盖(口径 ±10%,与统计一致) */
+.cal-cell.has-rec.rec-over::after {
+  background: #ee0a24;
+}
+.cal-cell.has-rec.rec-under::after {
+  background: #ff976a;
+}
+.cal-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 6px;
+  font-size: 10px;
+  color: #969799;
+}
+.cal-legend .dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: 1px;
+}
+.cal-legend .dot.ok {
+  background: var(--cb-primary);
+}
+.cal-legend .dot.over {
+  background: #ee0a24;
+}
+.cal-legend .dot.under {
+  background: #ff976a;
 }
 .cal-foot {
   text-align: center;

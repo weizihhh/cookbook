@@ -41,6 +41,7 @@
             <div class="kcal-caption">
               <span class="kcal-chip" :class="deviationClass">{{ deviationText }}</span>
               <span class="kcal-remaining">{{ remainingText }}</span>
+              <span v-if="canRecommend" class="rec-link" @click="recommendShow = true">推荐一餐 ›</span>
             </div>
           </div>
           <div class="macro-divider"></div>
@@ -143,6 +144,9 @@
             <van-button size="small" round plain type="primary" @click="openCheckin(meal.key)">
               打卡 · {{ checkinText(meal.key) }}
             </van-button>
+            <van-button size="small" round plain type="primary" @click="openTemplates(meal.key)">
+              模板
+            </van-button>
             <van-button
               v-if="yesterdayCount(meal.key)"
               size="small"
@@ -199,13 +203,19 @@
       @select="onCheckinSelect"
     />
 
-    <!-- 复制方式选择:今天该餐已有菜品时,问追加还是覆盖 -->
+    <!-- 常吃组合模板:存当前餐为命名模板 / 一键套用 -->
+    <MealTemplatesPopup v-model:show="templateShow" :meal-key="templateMealKey" @apply="onTemplateApply" />
+
+    <!-- 剩余预算推荐一餐 -->
+    <RecommendPopup v-model:show="recommendShow" :remaining="remainingBudget" @apply="onRecommendApply" />
+
+    <!-- 套用方式选择(复制昨日/模板/推荐共用):目标餐已有菜品时,问追加还是覆盖 -->
     <van-action-sheet
-      v-model:show="copySheetShow"
-      :actions="copySheetActions"
+      v-model:show="applySheetShow"
+      :actions="applySheetActions"
       cancel-text="取消"
       close-on-click-action
-      @select="onCopySheetSelect"
+      @select="onApplySheetSelect"
     />
   </div>
 </template>
@@ -227,6 +237,8 @@ import { TIPS } from '../data/tips'
 import MealDetailPopup from '../components/today/MealDetailPopup.vue'
 import AddRecipePopup from '../components/today/AddRecipePopup.vue'
 import AddConfirmPopup from '../components/today/AddConfirmPopup.vue'
+import MealTemplatesPopup from '../components/today/MealTemplatesPopup.vue'
+import RecommendPopup from '../components/today/RecommendPopup.vue'
 
 const profile = useProfileStore()
 const week = useWeekStore()
@@ -430,37 +442,74 @@ function mealItems(mealKey) {
   return todayMeals.value?.[mealKey] || []
 }
 
-// ---- 复制昨日:吃的单一固定时,一键把昨天同餐的记录搬到今天 ----
+// ---- 一键套用:复制昨日 / 常吃模板 / 预算推荐三条路共用同一交互 ----
+// 今天该餐为空直接套用;已有菜品时问追加还是覆盖(覆盖=该餐记录重来,清打卡防悬挂)
 function yesterdayCount(mealKey) {
   return (week.mealsOf(yesterday.value)?.[mealKey] || []).filter(Boolean).length
 }
-// 今天该餐为空直接复制;已有菜品时让用户选追加还是覆盖
-function copyYesterday(mealKey) {
-  if (!mealItems(mealKey).length) {
-    doCopyYesterday(mealKey, 'copy')
-    return
-  }
-  copySheetMeal.value = mealKey
-  copySheetShow.value = true
-}
-const copySheetShow = ref(false)
-const copySheetMeal = ref('')
-const copySheetActions = [
+const applySheetShow = ref(false)
+const applyPending = ref(null) // { mealKey, label, directVerb, apply(replace) => n }
+const applySheetActions = [
   { name: '追加到现有菜品后', value: 'append' },
   { name: '覆盖现有菜品', value: 'replace' },
 ]
-function onCopySheetSelect(action) {
-  doCopyYesterday(copySheetMeal.value, action.value)
+function requestApply(mealKey, label, directVerb, apply) {
+  if (!mealItems(mealKey).length) {
+    const n = apply(false)
+    if (n) showToast(`${directVerb}${label} ${n} 个菜品`)
+    return
+  }
+  applyPending.value = { mealKey, label, directVerb, apply }
+  applySheetShow.value = true
 }
-function doCopyYesterday(mealKey, mode) {
-  const label = MEALS.find((m) => m.key === mealKey)?.label || ''
-  const n = week.copyMeal(yesterday.value, today.value, mealKey, mode === 'replace')
+function onApplySheetSelect(action) {
+  const p = applyPending.value
+  applyPending.value = null
+  if (!p) return
+  const replace = action.value === 'replace'
+  const n = p.apply(replace)
   if (!n) return
-  // 覆盖=该餐记录重来,清掉旧打卡标记防悬挂
-  if (mode === 'replace') checkin.mark(today.value, mealKey, null)
-  const prefix =
-    mode === 'replace' ? `已覆盖为昨日${label}` : mode === 'append' ? `已追加昨日${label}` : `已复制昨日${label}`
-  showToast(`${prefix} ${n} 个菜品`)
+  if (replace) checkin.mark(today.value, p.mealKey, null)
+  showToast(`${replace ? '已覆盖为' : '已追加'}${p.label} ${n} 个菜品`)
+}
+function copyYesterday(mealKey) {
+  const label = MEALS.find((m) => m.key === mealKey)?.label || ''
+  requestApply(mealKey, `昨日${label}`, '已复制', (replace) =>
+    week.copyMeal(yesterday.value, today.value, mealKey, replace)
+  )
+}
+
+// ---- 常吃组合模板 ----
+const templateShow = ref(false)
+const templateMealKey = ref('')
+function openTemplates(mealKey) {
+  templateMealKey.value = mealKey
+  templateShow.value = true
+}
+function onTemplateApply(tpl) {
+  templateShow.value = false
+  requestApply(tpl.mealKey, `模板「${tpl.name}」`, '已套用', (replace) =>
+    week.applyTemplate(tpl.id, today.value, replace)
+  )
+}
+
+// ---- 剩余预算推荐一餐 ----
+const recommendShow = ref(false)
+// 入口条件:已有记录、未全跳过、剩余量在单餐合理区间(太少凑不出一餐,太多说明还没怎么吃)
+const canRecommend = computed(() => {
+  if (!hasAnyItem.value || allSkipped.value) return false
+  const r = targets.value.kcal - totals.value.kcal
+  return r >= 150 && r <= targets.value.kcal * 0.6
+})
+const remainingBudget = computed(() => ({
+  kcal: Math.max(0, Math.round(targets.value.kcal - totals.value.kcal)),
+  protein: Math.max(0, Math.round(targets.value.protein - totals.value.protein)),
+}))
+function onRecommendApply(items) {
+  recommendShow.value = false
+  requestApply('dinner', '推荐组合', '已添加', (replace) =>
+    week.pushMealItems(today.value, 'dinner', items, replace)
+  )
 }
 
 // ---- 体重 ----
@@ -764,6 +813,12 @@ function ingredientText(item) {
 .kcal-remaining {
   font-size: 12px;
   color: #697771;
+}
+.rec-link {
+  font-size: 12px;
+  color: var(--cb-primary);
+  font-weight: 500;
+  cursor: pointer;
 }
 .macro-divider {
   height: 1px;

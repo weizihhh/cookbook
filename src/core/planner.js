@@ -137,6 +137,46 @@ export function recentFoodDays(days, today, windowDays = 7) {
   return counts
 }
 
+/** 近 windowDays 天食材多样性:滚动窗内出现过的食材种数与其中蔬菜类种数
+ *  (与 recentFoodDays 同窗口、同"出现即计"口径)。膳食指南参考:平均每天 ≥12 种、每周 ≥25 种 */
+export function foodDiversity(days, today, foods, windowDays = 7) {
+  const counts = recentFoodDays(days, today, windowDays)
+  let vegetables = 0
+  for (const id of Object.keys(counts)) {
+    if (foods[id]?.category === 'vegetable') vegetables++
+  }
+  return { total: Object.keys(counts).length, vegetables }
+}
+
+/** 按"剩余预算"推荐一餐:把剩余热量/蛋白当作一餐目标去装配若干候选组合,
+ *  复用 assembleMeal 的槽位模板与 pickScored 真实交付口径(生成内核反哺记录路径)。
+ *  组合间按食谱 id 集合去重;返回候选数组,每项为该餐的 items(已滤空槽) */
+export function recommendMeals({ recipes, foods, kcal, protein, mealKey = 'dinner', excludedTags = [], foodDayCounts = null, count = 3 }) {
+  // 预算太小无餐可配,垫到单餐下限;蛋白同理(避免 0 导致缩放系数发散)
+  const target = { kcal: Math.max(150, kcal), protein: Math.max(8, protein) }
+  const out = []
+  const seen = new Set()
+  for (let i = 0; i < count * 6 && out.length < count; i++) {
+    const items = assembleMeal(mealKey, {
+      recipes,
+      foods,
+      target,
+      excludedTags,
+      usedIds: new Set(),
+      foodDayCounts,
+    }).filter(Boolean)
+    if (!items.length) continue
+    const key = items
+      .map((it) => it.recipeId)
+      .sort()
+      .join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(items)
+  }
+  return out
+}
+
 /** 食谱是否含"近 7 天已达建议上限"的食材。频次约束不参与池空回退:
  *  健康约束宁缺不破(蛋白池 51 候选中受控食谱仅 2 个,空槽概率可忽略) */
 function overLimit(recipe, foods, foodDayCounts) {

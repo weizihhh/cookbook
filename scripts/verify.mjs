@@ -11,6 +11,8 @@ import {
   summarizeIntake,
   computeNutrition,
   swapSlotItem,
+  foodDiversity,
+  recommendMeals,
 } from '../src/core/planner.js'
 import { FOODS, FOODS_MAP } from '../src/data/foods.js'
 import { RECIPES, RECIPES_MAP } from '../src/data/recipes.js'
@@ -749,6 +751,71 @@ for (let i = 0; i < 10; i++) {
   proteinPicks.add(items.find((it) => it?.slot === 'protein')?.recipeId)
 }
 check('蛋白槽真实交付口径:可放大达标者入合格池,不足者不再随机混入', proteinPicks.size === 1 && proteinPicks.has('x_p_big'), [...proteinPicks].join(','))
+
+// ---------- 28. v0.21.0 记录路径反哺:食材多样性 / 剩余预算推荐一餐 ----------
+// 多样性:7 天滚动窗"出现过的食材"去重计数 + 蔬菜类细分;窗口外不计、同食材多天算 1 种
+const divDays = {
+  // 第 8 天前:窗口外
+  [addDays(todayStr(), -8)]: {
+    breakfast: [{ recipeId: 'x_a', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 50, scalable: true }] }],
+    lunch: [],
+    dinner: [],
+  },
+  [addDays(todayStr(), -1)]: {
+    breakfast: [
+      { recipeId: 'x_b', slot: 'vegetable', ingredients: [{ foodId: 'f_broccoli', grams: 150, scalable: true }] },
+      { recipeId: 'x_c', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }] },
+    ],
+    lunch: [],
+    dinner: [],
+  },
+  [todayStr()]: {
+    breakfast: [
+      { recipeId: 'x_b', slot: 'vegetable', ingredients: [{ foodId: 'f_broccoli', grams: 100, scalable: true }] },
+      { recipeId: 'x_d', slot: 'vegetable', ingredients: [{ foodId: 'f_spinach', grams: 120, scalable: true }] },
+    ],
+    lunch: [{ recipeId: 'x_e', slot: 'protein', ingredients: [{ foodId: 'f_chicken_breast', grams: 120, scalable: true }] }],
+    dinner: [],
+  },
+}
+const dv = foodDiversity(divDays, todayStr(), FOODS_MAP)
+check('foodDiversity:7 天滚动窗种数=4(蛋在窗口外不计,西兰花跨天算 1)', dv.total === 4, `got ${JSON.stringify(dv)}`)
+check('foodDiversity:蔬菜类细分=2(西兰花+菠菜,米/蛋不算)', dv.vegetables === 2, `got ${dv.vegetables}`)
+check('foodDiversity:空数据为 0 种', foodDiversity({}, todayStr(), FOODS_MAP).total === 0)
+
+// 剩余预算推荐:400kcal/30g 典型晚间预算,产出 1~3 个不重复组合;
+// 组合内食谱 id 全部有效,营养落在预算宽松带(固定份蔬菜+缩放截断允许偏差)
+const recs = recommendMeals({ recipes: RECIPES, foods: FOODS_MAP, kcal: 400, protein: 30, mealKey: 'dinner', excludedTags: [] })
+check('recommendMeals:400kcal/30g 预算产出 1~3 个候选', recs.length >= 1 && recs.length <= 3, `got ${recs.length}`)
+const recKeys = new Set(recs.map((items) => items.map((it) => it.recipeId).sort().join('|')))
+check('recommendMeals:候选组合互不重复', recKeys.size === recs.length, [...recKeys].join(' || '))
+let recOk = true
+let recDetail = ''
+for (const items of recs) {
+  let kcal = 0
+  let protein = 0
+  for (const it of items) {
+    if (!RECIPES_MAP[it.recipeId]) {
+      recOk = false
+      recDetail = `未知食谱 ${it.recipeId}`
+    }
+    const n = computeNutrition(it.ingredients, FOODS_MAP)
+    kcal += n.kcal
+    protein += n.protein
+  }
+  if (kcal > 400 * 1.6 || kcal < 400 * 0.4) {
+    recOk = false
+    recDetail = `kcal=${kcal} 超出宽松带`
+  }
+  if (protein < 12) {
+    recOk = false
+    recDetail = `protein=${protein} 过低`
+  }
+}
+check('recommendMeals:候选营养落在预算宽松带(0.4~1.6×)且食谱 id 全部有效', recOk, recDetail)
+// 端到端守卫:全池为空时返回空数组(而非崩在空池/产出空组合)
+const recNone = recommendMeals({ recipes: [], foods: FOODS_MAP, kcal: 400, protein: 30, mealKey: 'dinner', excludedTags: [] })
+check('recommendMeals:候选池全空时返回空数组', recNone.length === 0, `got ${recNone.length}`)
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

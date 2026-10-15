@@ -13,20 +13,21 @@ const KEY = 'week'
 function initState() {
   const saved = loadState(KEY, null)
   if (saved?.days) {
-    pruneStaleEmptyDays(saved.days)
-    return saved
+    pruneStaleEmptyDays(saved.days, saved.templates || [])
+    // 老数据没有 templates 字段,补默认空数组(state 顶层 key 固定,序列化才完整)
+    return { templates: [], ...saved }
   }
   const oldPlan = loadState('plan', null)
   if (oldPlan?.meals && oldPlan.date) {
     removeState('plan')
-    return { weekStart: weekStartOf(oldPlan.date), days: { [oldPlan.date]: oldPlan.meals } }
+    return { weekStart: weekStartOf(oldPlan.date), days: { [oldPlan.date]: oldPlan.meals }, templates: [] }
   }
-  return { weekStart: weekStartOf(todayStr()), days: {} }
+  return { weekStart: weekStartOf(todayStr()), days: {}, templates: [] }
 }
 
 /** 数据治理:清掉 180 天前"生成过但没有任何菜品"的空天(有内容的天永不清理),
  *  防止长期使用把 localStorage 撑满;改动立即写回 */
-function pruneStaleEmptyDays(days) {
+function pruneStaleEmptyDays(days, templates = []) {
   const cutoff = addDays(todayStr(), -180)
   let changed = false
   for (const [date, meals] of Object.entries(days)) {
@@ -37,7 +38,8 @@ function pruneStaleEmptyDays(days) {
       changed = true
     }
   }
-  if (changed) saveState(KEY, { weekStart: weekStartOf(todayStr()), days })
+  // 写回必须带上 templates,否则触发清理的加载会把模板一并丢掉
+  if (changed) saveState(KEY, { weekStart: weekStartOf(todayStr()), days, templates })
 }
 
 export const useWeekStore = defineStore('week', {
@@ -47,7 +49,7 @@ export const useWeekStore = defineStore('week', {
 
   actions: {
     persist() {
-      saveState(KEY, { weekStart: this.weekStart, days: this.days })
+      saveState(KEY, { weekStart: this.weekStart, days: this.days, templates: this.templates })
     },
     /** 切到某天所在周(保留其他周已生成的数据) */
     syncWeekOf(date) {
@@ -192,7 +194,8 @@ export const useWeekStore = defineStore('week', {
       this.persist()
       return true
     },
-    /** 移除所有天中某食谱的全部条目(删除自定义食物时清理餐单引用),返回移除条数 */
+    /** 移除所有天中某食谱的全部条目(删除自定义食物时清理餐单引用;模板里一并清,
+     *  清空的模板随之删除),返回移除条数 */
     removeRecipeEverywhere(recipeId) {
       let removed = 0
       for (const meals of Object.values(this.days)) {
@@ -205,22 +208,71 @@ export const useWeekStore = defineStore('week', {
           if (next.length !== list.length) meals[mealKey] = next
         }
       }
+      for (const tpl of this.templates) {
+        const next = tpl.items.filter((it) => it.recipeId !== recipeId)
+        if (next.length !== tpl.items.length) {
+          removed += tpl.items.length - next.length
+          tpl.items = next
+        }
+      }
+      this.templates = this.templates.filter((t) => t.items.length)
       if (removed > 0) this.persist()
       return removed
     },
     /** 把某天某餐复制到另一天同餐(打卡状态不带);replace 时先清目标餐再复制,返回复制条数 */
     copyMeal(fromDate, toDate, mealKey, replace = false) {
-      const items = cloneMealItems(this.days[fromDate]?.[mealKey])
-      if (!items.length) return 0
-      this.syncWeekOf(toDate)
-      if (!this.days[toDate]) this.days[toDate] = { breakfast: [], lunch: [], dinner: [] }
-      if (replace) this.days[toDate][mealKey] = []
-      this.days[toDate][mealKey].push(...items)
+      return this.pushMealItems(toDate, mealKey, this.days[fromDate]?.[mealKey], replace)
+    },
+    /** 把一组菜品写入某天某餐(追加;replace 先清目标餐再写入),写入前深拷贝。
+     *  复制昨日/模板套用/预算推荐采纳共用;当天无数据时创建空天(免生成直接记录) */
+    pushMealItems(date, mealKey, items, replace = false) {
+      const list = cloneMealItems(items)
+      if (!list.length) return 0
+      this.syncWeekOf(date)
+      if (!this.days[date]) this.days[date] = { breakfast: [], lunch: [], dinner: [] }
+      if (replace) this.days[date][mealKey] = []
+      this.days[date][mealKey].push(...list)
       this.persist()
-      return items.length
+      return list.length
+    },
+    // ---- 常吃组合模板:把某天某餐存为命名模板("标配早餐"),任意天一键套用 ----
+    /** 存为模板;同餐同名覆盖更新(吃法变了再存一次即可),返回是否成功 */
+    saveTemplate(date, mealKey, name) {
+      const items = cloneMealItems(this.days[date]?.[mealKey])
+      const cleanName = (name || '').trim()
+      if (!items.length || !cleanName) return false
+      const existing = this.templates.find((t) => t.mealKey === mealKey && t.name === cleanName)
+      if (existing) {
+        existing.items = items
+        existing.createdAt = todayStr()
+      } else {
+        this.templates.push({
+          id: `t_${Date.now().toString(36)}`,
+          mealKey,
+          name: cleanName,
+          items,
+          createdAt: todayStr(),
+        })
+      }
+      this.persist()
+      return true
+    },
+    /** 套用模板到某天同餐(追加;replace 先清目标餐),返回套用条数 */
+    applyTemplate(templateId, date, replace = false) {
+      const tpl = this.templates.find((t) => t.id === templateId)
+      if (!tpl) return 0
+      return this.pushMealItems(date, tpl.mealKey, tpl.items, replace)
+    },
+    deleteTemplate(templateId) {
+      const i = this.templates.findIndex((t) => t.id === templateId)
+      if (i < 0) return false
+      this.templates.splice(i, 1)
+      this.persist()
+      return true
     },
     clearAll() {
       this.days = {}
+      this.templates = []
       this.persist()
     },
   },
