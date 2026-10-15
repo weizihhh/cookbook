@@ -278,7 +278,7 @@ const RAW_RECIPES = [
     steps: ['1个鸡蛋加3个蛋白打散', '少油小火煎成蛋卷,可卷入蔬菜碎'],
   },
   {
-    id: 'r_chickpea_salad', name: '凉拌鹰嘴豆', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: ['soy'],
+    id: 'r_chickpea_salad', name: '凉拌鹰嘴豆', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [],
     ingredients: [
       { foodId: 'f_chickpea_cooked', grams: 180, scalable: true },
       { foodId: 'f_olive_oil', grams: 3, scalable: false },
@@ -569,7 +569,7 @@ const RAW_RECIPES = [
     steps: ['排骨斩小块洗净沥干', '加豆豉、蒜末、生抽腌20分钟,上锅蒸25分钟'],
   },
   {
-    id: 'r_lions_head_meatball', name: '清炖狮子头(瘦)', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork'],
+    id: 'r_lions_head_meatball', name: '清炖狮子头(瘦)', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['pork', 'egg'],
     ingredients: [
       { foodId: 'f_pork_loin', grams: 130, scalable: true },
       { foodId: 'f_egg_white', grams: 30, scalable: true },

@@ -203,10 +203,14 @@ function usedKcal(items, foods) {
 /**
  * 与 scaleRecipe 完全同口径的真实交付量:s 上限、克数边界、单位吸附之后的实际
  * 营养(含固定佐料)。选择判据必须用它——理论值 base×s 会被克数上限截断,
- * 低密度主食曾以"自称能交付"混进合格池,实际交付不足
+ * 低密度主食曾以"自称能交付"混进合格池,实际交付不足。蛋白槽 v0.20.1 起同口径
+ * (评审 v5 F-2):理论值还隐含缩放系数 ≤1,可放大达标(如蒸蛋羹)的候选被低估
  */
-function realDeliverable(recipe, foods, metric, want) {
-  const scaled = scaleRecipe(recipe, foods, metric === 'kcal' ? { byKcal: want } : { byProtein: want })
+function realDeliverable(recipe, foods, metric, want, maxKcal = null) {
+  const scaled = scaleRecipe(recipe, foods, {
+    ...(metric === 'kcal' ? { byKcal: want } : { byProtein: want }),
+    ...(maxKcal != null ? { maxKcal } : {}),
+  })
   return computeNutrition(scaled.ingredients, foods)[metric]
 }
 
@@ -214,9 +218,9 @@ function realDeliverable(recipe, foods, metric, want) {
  * 按"真实可交付量"挑候选:能交付 ≥90% 目标的优先入池再随机,
  * 都不够时从交付量最高的前5个随机,兼顾达标与多样性
  */
-function pickScored(candidates, usedIds, foods, metric, want, recentIds = []) {
+function pickScored(candidates, usedIds, foods, metric, want, recentIds = [], maxKcal = null) {
   if (!candidates.length) return null
-  const scored = candidates.map((r) => ({ r, deliverable: realDeliverable(r, foods, metric, want) }))
+  const scored = candidates.map((r) => ({ r, deliverable: realDeliverable(r, foods, metric, want, maxKcal) }))
   let pool = scored.filter((c) => !usedIds.has(c.r.id))
   if (!pool.length) pool = scored
   // 最近吃过优先于营养最优:生成只是参考起点,吃固定的菜的人要的是熟悉的组合
@@ -258,40 +262,17 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   }
 
   // 2) 蛋白:优先选"热量上限内能足量供蛋白"的候选(高脂蛋白源如鸡蛋
-  //    在低热量餐会供不应求,自动退居备选),再从中随机保证多样性
+  //    在低热量餐会供不应求,自动退居备选),再从中随机保证多样性。
+  //    打分与主食槽同走 pickScored 真实交付口径(v0.20.1 评审 v5 F-2):
+  //    旧理论口径隐含缩放系数 ≤1,可放大达标的奶/豆制品被挡在合格池外
   const proteinWant = target.protein * 0.85
   const proteinMaxKcal = target.kcal * 0.45
-  const scoredCand = filterCandidates(recipes, { slot: 'protein', meal: mealKey, excludedTags })
+  const proteinCand = filterCandidates(recipes, { slot: 'protein', meal: mealKey, excludedTags })
     .filter((r) => !overLimit(r, foods, foodDayCounts))
-    .map((r) => {
-      const base = scalableBase(r, foods)
-      const deliverable =
-        base.kcal > 0
-          ? Math.min(proteinWant, base.protein * Math.min(1, proteinMaxKcal / base.kcal))
-          : 0
-      return { r, deliverable }
-    }
-  )
-  let proteinPool = scoredCand.filter((c) => !usedIds.has(c.r.id))
-  if (!proteinPool.length) proteinPool = scoredCand
-  // 最近吃过优先于营养最优(与 pickScored 同规则):先从熟悉的蛋白候选中选
-  const proteinRecent = proteinPool.filter((c) => recentIds.includes(c.r.id))
-  let proteinPick = null
-  if (proteinRecent.length) {
-    const top = [...proteinRecent].sort((a, b) => b.deliverable - a.deliverable).slice(0, 3)
-    proteinPick = top[Math.floor(Math.random() * top.length)]
-  } else {
-    const proteinQualified = proteinPool.filter((c) => c.deliverable >= proteinWant * 0.9)
-    const proteinFinal = proteinQualified.length
-      ? proteinQualified
-      : [...proteinPool].sort((a, b) => b.deliverable - a.deliverable).slice(0, 5)
-    proteinPick = proteinFinal.length
-      ? proteinFinal[Math.floor(Math.random() * proteinFinal.length)]
-      : null
-  }
-  if (proteinPick) {
-    usedIds.add(proteinPick.r.id)
-    items.protein = scaleRecipe(proteinPick.r, foods, {
+  const proteinRecipe = pickScored(proteinCand, usedIds, foods, 'protein', proteinWant, recentIds, proteinMaxKcal)
+  if (proteinRecipe) {
+    usedIds.add(proteinRecipe.id)
+    items.protein = scaleRecipe(proteinRecipe, foods, {
       byProtein: proteinWant,
       maxKcal: proteinMaxKcal,
     })
@@ -414,6 +395,21 @@ const CATEGORY_ORDER = ['meat', 'seafood', 'egg_dairy_soy', 'grain', 'vegetable'
 function categoryOrder(c) {
   const i = CATEGORY_ORDER.indexOf(c)
   return i === -1 ? 99 : i
+}
+
+/** 从 days(周计划结构 {日期: {breakfast/lunch/dinner: 条目[]}})提取全库已出现过的
+ *  食谱 id。换菜的"避开吃过的"用它;曾因 store 层 .flat() 展不开 meals 对象而
+ *  恒为空集(评审 v5 F-1),下沉为纯函数供 verify 直测,堵住组装层不可测的盲区 */
+export function collectUsedRecipeIds(days) {
+  const ids = new Set()
+  for (const meals of Object.values(days || {})) {
+    for (const items of Object.values(meals || {})) {
+      for (const it of items || []) {
+        if (it) ids.add(it.recipeId)
+      }
+    }
+  }
+  return ids
 }
 
 /**

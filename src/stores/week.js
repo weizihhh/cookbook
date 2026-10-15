@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodDays } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodDays, collectUsedRecipeIds } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
@@ -120,12 +120,7 @@ export const useWeekStore = defineStore('week', {
       }
       if (idx < 0) return false
       const current = list[idx]
-      const usedIds = new Set(
-        Object.values(this.days)
-          .flat()
-          .filter(Boolean)
-          .map((it) => it.recipeId)
-      )
+      const usedIds = collectUsedRecipeIds(this.days)
       const target = profile.targets.meals.find((m) => m.key === mealKey)
       // 换主食按该餐剩余热量缩放(扣掉其它条目已占用的),不再用固定 45% 估算
       const othersKcal = list.reduce(

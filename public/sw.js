@@ -4,7 +4,7 @@
 // - 静态资源(哈希文件名的 js/css/图标)cache-first:内容寻址永不变化,缓存命中即离线可用
 // - 发新版本流程:发布新构建后改 CACHE 版本号,activate 阶段清掉旧缓存
 // 注:OCR 语言包走 CDN(跨域)不缓存,首次离线时拍照导入不可用,属已知取舍
-const CACHE = 'cookbook-shell-v1'
+const CACHE = 'cookbook-shell-v2'
 const SHELL = [
   './',
   './index.html',

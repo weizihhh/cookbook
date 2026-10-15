@@ -527,8 +527,9 @@ check('采购清单输出购买量(300g 带壳蛤蜊)', shellList[0]?.grams === 
 // 排除组合边界:全部排除标签的任意单/双组合下,每餐每槽位的实际候选数(蔬菜槽含
 // 100g 门槛,与 assembleMeal 同规则)必须 > 0 —— 防止后续打标/删食谱让"合理排除"
 // 也掏空槽位。既有排除测试只查泄漏不查空槽(filter(Boolean) 会放过 null),本条补上。
-// 已知边界(有意不修,见 docs/DECISIONS.md):egg+milk+soy 三排时早餐蛋白槽为 0,
-// 今日页空态文案会指引用户去设置调整。
+// 三组合以上不在此断言范围;egg+milk+soy 三排时早餐蛋白槽原为 0(曾登记为
+// 已知边界,见 docs/DECISIONS.md),v0.20.1 摘除鹰嘴豆误标 soy 后不再为 0,
+// 由 §27 的专项断言固化。
 {
   const tags = EXCLUDE_TAGS.map((t) => t.value)
   const combos = [
@@ -675,6 +676,79 @@ const isPng = (u) => {
 }
 check('图标为有效 PNG(192/512/maskable/apple)', ['icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png']
   .every((f) => isPng(pub(`icons/${f}`))))
+
+// ---------- 27. v0.20.1 评审 v5 落地:标签一致性 / usedIds 组装 / 蛋白槽真实交付口径 ----------
+// 食材 → 排除标签一致性:排除标签是过敏/忌口语义,标签与配料不一致时过滤机制
+// 永远"正确"(§4 只测机制),缺标(泄漏,如狮子头含蛋白缺 egg)和多标(误伤,
+// 如鹰嘴豆非大豆误标 soy)都不会红。映射按现库约定以显式 foodId 固化:
+// 海带/紫菜(藻类,category=vegetable)不算海鲜;绿豆芽/红豆/绿豆/鹰嘴豆等
+// 非大豆杂豆不算豆制品;燕麦按麸质处理(交叉污染保守);玉米面无麸质。
+// 辣味无独立食材锚点(调味写在 steps),不做断言。
+// 维护规则:新增食材若属上述家族,必须同步登记本映射,否则下一行直接红。
+const FOOD_REQUIRED_TAG = {
+  pork: ['f_pork_loin', 'f_pork_leg', 'f_pork_liver', 'f_pork_ribs'],
+  beef: ['f_beef_shank', 'f_beef_lean', 'f_beef_brisket'],
+  chicken: ['f_chicken_breast', 'f_chicken_leg', 'f_chicken_wing'],
+  duck: ['f_duck_breast'],
+  rabbit: ['f_rabbit'],
+  lamb: ['f_lamb_lean'],
+  seafood: ['f_bass', 'f_salmon', 'f_cod', 'f_basa', 'f_shrimp', 'f_squid', 'f_clam', 'f_tuna_canned', 'f_crucian', 'f_razor_clam', 'f_pomfret', 'f_scallop', 'f_dried_small_shrimp', 'f_oyster'],
+  egg: ['f_egg', 'f_egg_white', 'f_quail_egg'],
+  milk: ['f_milk', 'f_milk_low_fat', 'f_yogurt_plain', 'f_cottage_cheese'],
+  soy: ['f_soy_milk', 'f_tofu_soft', 'f_black_bean_dry', 'f_tofu_firm', 'f_tofu_dried', 'f_edamame', 'f_tofu_sheet', 'f_yuba', 'f_vegetarian_chicken', 'f_soybean_sprout'],
+  gluten: ['f_whole_wheat_bread', 'f_steamed_bun', 'f_buckwheat_noodle', 'f_pasta', 'f_noodles_dry', 'f_whole_wheat_flour', 'f_oats'],
+  nuts: ['f_walnut', 'f_almond'],
+}
+const FOOD_TAG_OF = {}
+for (const [tag, ids] of Object.entries(FOOD_REQUIRED_TAG)) for (const id of ids) FOOD_TAG_OF[id] = tag
+const tagIssues = []
+for (const r of RECIPES) {
+  const ingTags = new Set(r.ingredients.map((i) => FOOD_TAG_OF[i.foodId]).filter(Boolean))
+  for (const t of ingTags) if (!r.tags.includes(t)) tagIssues.push(`${r.id} 缺 ${t}`)
+  for (const t of r.tags) if (FOOD_REQUIRED_TAG[t] && !ingTags.has(t)) tagIssues.push(`${r.id} 多 ${t}`)
+}
+check('食材→排除标签双向一致(缺标=过敏泄漏,多标=误伤)', tagIssues.length === 0, tagIssues.join('; '))
+// category=seafood 的已用食材必须登记进 seafood 家族(防"生蚝"类贝科漏网:
+// 名字正则不可靠,v5 评审双方初版映射都漏过 f_oyster)
+const usedFoodIds = new Set(RECIPES.flatMap((r) => r.ingredients.map((i) => i.foodId)))
+const unregSeafood = [...usedFoodIds].filter((id) => FOODS_MAP[id]?.category === 'seafood' && FOOD_TAG_OF[id] !== 'seafood')
+check('seafood 类食材全部登记映射(category 兜底)', unregSeafood.length === 0, unregSeafood.join(', '))
+// 三排边界回归:v0.20.1 摘除鹰嘴豆误标 soy 后,早餐蛋白槽不再为 0
+const tripleCand = RECIPES.filter(
+  (r) => r.slot === 'protein' && r.mealFit.includes('breakfast') && ['egg', 'milk', 'soy'].every((t) => !r.tags.includes(t))
+)
+check('egg+milk+soy 三排后早餐蛋白仍有候选(鹰嘴豆误标摘除,v0.17.1 边界撤销)', tripleCand.length >= 1, `got ${tripleCand.map((r) => r.id).join(',')}`)
+
+// 换菜 usedIds 组装:store 层曾用 Object.values(days).flat() 展不开 meals 对象,
+// usedIds 恒为空集,"避开吃过的"从未生效(评审 v5 F-1)。下沉为纯函数直测:
+// 按天×餐次展开、跨天去重、跳过空天/空餐/空槽
+const { collectUsedRecipeIds } = await import('../src/core/planner.js')
+const daysUsed = {
+  '2026-10-13': { breakfast: [{ recipeId: 'x_a' }, null], lunch: [], dinner: [{ recipeId: 'x_b' }] },
+  '2026-10-14': { breakfast: [], lunch: [{ recipeId: 'x_a' }], dinner: [] },
+  '2026-10-15': null,
+}
+const usedIdsAll = collectUsedRecipeIds(daysUsed)
+check('collectUsedRecipeIds:按天×餐次展开、跨天去重、跳过空天与空槽', usedIdsAll.size === 2 && usedIdsAll.has('x_a') && usedIdsAll.has('x_b'), [...usedIdsAll].join(','))
+
+// 蛋白槽打分口径与主食槽统一为真实交付(v0.20.1 评审 v5 F-2):
+// 蒸蛋羹基准 20.3g 蛋白,25.5g 目标下理论口径(隐含 s≤1)判 20.3 不合格,
+// 真实口径放大+单位吸附实际交付 28.8g
+const custardScaled = scaleRecipe(RECIPES_MAP['r_steamed_egg_custard'], FOODS_MAP, { byProtein: 25.5, maxKcal: 405 })
+check('蛋白槽真实交付锚点:蒸蛋羹 25.5g 目标实际交付 28.8g(理论口径会低估为 20.3)', computeNutrition(custardScaled.ingredients, FOODS_MAP).protein === 28.8)
+// 合成池:x_p_big 基准 100g 鸡蛋放大后真实达标,x_p_small 基准 50g 到 s=3 上限
+// 仍不足(19.95g)。旧理论口径两者都不合格、双双落入兜底随机;新口径合格池
+// 只含前者,随机 10 次应恒选前者
+const synthProteinPool = [
+  { id: 'x_p_big', name: '合成放大达标蛋白', slot: 'protein', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_egg', grams: 100, scalable: true }], steps: [] },
+  { id: 'x_p_small', name: '合成不足蛋白', slot: 'protein', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_egg', grams: 50, scalable: true }], steps: [] },
+]
+const proteinPicks = new Set()
+for (let i = 0; i < 10; i++) {
+  const items = assembleMeal('breakfast', { recipes: synthProteinPool, foods: FOODS_MAP, target: { kcal: 900, protein: 30 }, excludedTags: [], usedIds: new Set() })
+  proteinPicks.add(items.find((it) => it?.slot === 'protein')?.recipeId)
+}
+check('蛋白槽真实交付口径:可放大达标者入合格池,不足者不再随机混入', proteinPicks.size === 1 && proteinPicks.has('x_p_big'), [...proteinPicks].join(','))
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
