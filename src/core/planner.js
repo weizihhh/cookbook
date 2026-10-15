@@ -315,7 +315,9 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   return slots.map((slot) => items[slot])
 }
 
-/** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } } */
+/** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } }
+ *  foodDayCounts 三餐共用且天内不累计:同一天两个含同一受限食材的不同食谱可同时
+ *  入选;跨天累计由 generateWeekPlan 负责(受限食材入多食谱前需先补天内累计) */
 export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null, recentIds = [], foodDayCounts = null }) {
   const usedIds = sharedUsedIds ?? new Set() // 传入共享集合时跨天尽量不重复用同一食谱
   const meals = {}
