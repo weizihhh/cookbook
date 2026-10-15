@@ -566,5 +566,27 @@ check('口径角标:挂面(干)', formatFoodAmount(FOODS_MAP['f_noodles_dry'], 1
 check('口径角标:鹰嘴豆(熟)', formatFoodAmount(FOODS_MAP['f_chickpea_cooked'], 100) === '100g·熟重')
 check('口径角标:无标记食材不受影响', formatFoodAmount(FOODS_MAP['f_yam'], 200) === '200g')
 
+// ---------- 24. v0.18.0 目标体重进度预测 ----------
+const { theoryProgress, measuredWeeklyRate } = await import('../src/core/nutrition.js')
+// 理论:缺口 500kcal/天 → 周 500×7/7700 ≈ -0.455kg;剩 10kg → ceil(77000/500)=154 天
+const tp = theoryProgress({ tdee: 2500, kcal: 2000, currentWeight: 75, targetWeight: 65, today: '2026-10-15' })
+check('理论进度:缺口500 → 周约-0.45kg、154天、日期对齐', tp != null && Math.abs(tp.weeklyKg + 3500 / 7700) < 1e-9 && tp.days === 154 && tp.date === addDays('2026-10-15', 154))
+// 增肌方向:盈余 +280 → 周 +0.255kg,剩 6kg(目标高于当前)才成立
+const tpBulk = theoryProgress({ tdee: 2800, kcal: 3080, currentWeight: 64, targetWeight: 70, today: '2026-10-15' })
+check('理论进度:增肌盈余280 → 周约+0.25kg', tpBulk != null && Math.abs(tpBulk.weeklyKg - 280 * 7 / 7700) < 1e-9)
+// 无解场景:维持(缺口≈0)、方向与模式不符、未设目标
+check('理论进度:维持/方向不符/未设目标返回 null',
+  theoryProgress({ tdee: 2500, kcal: 2500, currentWeight: 75, targetWeight: 65, today: 't' }) === null &&
+  theoryProgress({ tdee: 2800, kcal: 3080, currentWeight: 75, targetWeight: 65, today: 't' }) === null &&
+  theoryProgress({ tdee: 2500, kcal: 2000, currentWeight: 75, targetWeight: null, today: 't' }) === null)
+// 实测速率:28 天窗口首尾口径;21 天降 1.05kg → -0.35kg/周
+check('实测速率:窗口内首尾差换算周速率', Math.abs(measuredWeeklyRate([
+  { date: '2026-09-24', kg: 75.3 }, { date: '2026-10-01', kg: 74.9 }, { date: '2026-10-15', kg: 74.25 },
+], '2026-10-15') + 0.35) < 1e-9)
+check('实测速率:窗口外记录不计入(仅1条在窗内 → null)',
+  measuredWeeklyRate([{ date: '2026-09-16', kg: 75.5 }, { date: '2026-10-15', kg: 74 }], '2026-10-15') === null)
+check('实测速率:跨度不足14天 → null(短期波动无意义)',
+  measuredWeeklyRate([{ date: '2026-10-08', kg: 75.5 }, { date: '2026-10-15', kg: 74.5 }], '2026-10-15') === null)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

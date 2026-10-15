@@ -13,6 +13,12 @@
       <van-field v-model.number="form.height" type="digit" label="身高" placeholder="cm" />
       <van-field v-model.number="form.weight" type="number" label="体重" placeholder="kg" />
       <van-field
+        v-model.number="form.targetWeight"
+        type="number"
+        label="目标体重"
+        placeholder="选填,用于进度预测(kg)"
+      />
+      <van-field
         v-model="activityLabel"
         is-link
         readonly
@@ -240,6 +246,7 @@ const form = reactive({
   age: profile.age,
   height: profile.height,
   weight: profile.weight,
+  targetWeight: profile.targetWeight ?? null,
   activity: profile.activity,
   mode: profile.mode,
   macroPreset: profile.macroPreset || 'custom',
@@ -368,6 +375,7 @@ function save(silent = false) {
     ...form,
     mealSplit: normalizeSplit(),
     manualKcal: manualKcalInput.value ? Number(manualKcalInput.value) : null,
+    targetWeight: form.targetWeight > 0 ? form.targetWeight : null, // 清空输入归 null
   })
   if (!silent) showToast('已保存')
 }

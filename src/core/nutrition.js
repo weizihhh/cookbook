@@ -1,5 +1,6 @@
 // 营养目标计算 —— 纯函数,无框架依赖
 // 公式:Mifflin-St Jeor(公开通用公式);数值为估算,供参考不作医疗建议
+import { addDays, parseDate } from '../utils/date.js'
 
 export const ACTIVITY_LEVELS = [
   { value: 1.2, label: '久坐(几乎不运动)' },
@@ -75,6 +76,14 @@ const round = (v, digits = 0) => {
   return Math.round(v * p) / p
 }
 
+/** today 起往前 days 个日历日的窗口起始日(YYYY-MM-DD) */
+function windowFrom(today, days) {
+  const [y, m, d] = today.split('-').map(Number)
+  const start = new Date(y, m - 1, d - (days - 1))
+  const p = (n) => String(n).padStart(2, '0')
+  return `${start.getFullYear()}-${p(start.getMonth() + 1)}-${p(start.getDate())}`
+}
+
 /** Mifflin-St Jeor 基础代谢 */
 export function calcBMR({ gender, weight, height, age }) {
   const base = 10 * weight + 6.25 * height - 5 * age
@@ -83,10 +92,7 @@ export function calcBMR({ gender, weight, height, age }) {
 
 /** 近 N 个日历日内的体重均值(稀疏称重:窗口内无记录返回 null) */
 export function recentWeightAvg(records, today, days = 7) {
-  const [y, m, d] = today.split('-').map(Number)
-  const start = new Date(y, m - 1, d - (days - 1))
-  const p = (n) => String(n).padStart(2, '0')
-  const from = `${start.getFullYear()}-${p(start.getMonth() + 1)}-${p(start.getDate())}`
+  const from = windowFrom(today, days)
   const inRange = records.filter((r) => r.date >= from && r.date <= today)
   if (!inRange.length) return null
   return inRange.reduce((s, r) => s + r.kg, 0) / inRange.length
@@ -106,6 +112,41 @@ export function effectiveWeight(profileWeight, recentAvg) {
 
 export function calcTDEE(bmr, activity) {
   return bmr * activity
+}
+
+/** 体脂能量密度常用近似:减/增 1kg 体重 ≈ 7700 kcal(个体与代谢适应会带来浮动) */
+export const KCAL_PER_KG = 7700
+
+/**
+ * 理论体重进度:按"目标热量 vs TDEE"的静态缺口(减脂)/盈余(增肌)推算
+ * 每周变化量与到达目标体重所需天数。维持模式(无缺口)、目标未设或方向与
+ * 模式不符(如增肌却把目标设在当前之下)时返回 null。
+ * @returns null | { gapKcal, weeklyKg, days, date }  weeklyKg 带符号(减脂为负)
+ */
+export function theoryProgress({ tdee, kcal, currentWeight, targetWeight, today }) {
+  if (!(targetWeight > 0) || !(currentWeight > 0)) return null
+  const gap = tdee - kcal
+  if (Math.abs(gap) < 1) return null
+  const remaining = currentWeight - targetWeight
+  if (remaining === 0 || remaining * gap < 0) return null
+  const weeklyKg = -(gap * 7) / KCAL_PER_KG // 缺口(正)→体重下降(负),盈余→上升
+  const days = Math.ceil((Math.abs(remaining) * KCAL_PER_KG) / Math.abs(gap))
+  return { gapKcal: Math.round(gap), weeklyKg, days, date: addDays(today, days) }
+}
+
+/**
+ * 实测周变化率:近 windowDays 天(默认 28)窗口内体重记录首尾差换算 kg/周。
+ * 与记录页"区间体重变化"同为首尾口径;少于 2 条或跨度不足 14 天返回 null
+ * (短期水分波动会淹没真实趋势)。
+ */
+export function measuredWeeklyRate(records, today, windowDays = 28) {
+  const from = windowFrom(today, windowDays)
+  const inRange = records.filter((r) => r.date >= from && r.date <= today)
+  if (inRange.length < 2) return null
+  const spanMs = parseDate(inRange[inRange.length - 1].date) - parseDate(inRange[0].date)
+  const spanDays = Math.round(spanMs / 86400000)
+  if (spanDays < 14) return null
+  return ((inRange[inRange.length - 1].kg - inRange[0].kg) / spanDays) * 7
 }
 
 /**

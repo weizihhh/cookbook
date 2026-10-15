@@ -91,6 +91,29 @@
         </template>
         <div v-else class="diet-note">{{ trendRange === 'week' ? '本周' : '本月' }}还没有饮食记录</div>
       </div>
+
+      <!-- 目标进度:减脂双轨预测 / 增肌增速对照;维持模式不渲染 -->
+      <template v-if="progressInfo">
+        <div class="stat-divider"></div>
+        <div class="diet-stats">
+          <div v-if="progressInfo.placeholder" class="diet-note">{{ progressInfo.placeholder }}</div>
+          <template v-else>
+            <div class="diet-row">
+              <span class="diet-label">目标进度</span>
+              <span class="diet-val">
+                {{ progressInfo.current }}kg → <b>{{ progressInfo.target }}</b>kg
+                <i v-if="progressInfo.done" class="ok">已达标 ✓</i>
+              </span>
+            </div>
+            <div v-for="r in progressInfo.rows" :key="r.label" class="diet-row">
+              <span class="diet-label">{{ r.label }}</span>
+              <span class="diet-val">{{ r.text }}</span>
+            </div>
+            <div v-if="progressInfo.hint" class="diet-note">{{ progressInfo.hint }}</div>
+            <div class="diet-note">起点按近 7 天均值 · 按 7700 kcal ≈ 1kg 估算,受代谢适应影响,仅供参考</div>
+          </template>
+        </div>
+      </template>
     </van-cell-group>
 
     <!-- 每日记录:日历形式,点日期查看当天食谱 -->
@@ -204,7 +227,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
-import { MEALS } from '../core/nutrition'
+import { MEALS, theoryProgress, measuredWeeklyRate } from '../core/nutrition'
 import { SLOT_LABELS, computeNutrition, summarizeIntake } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
@@ -331,6 +354,62 @@ function pctText(pct) {
   if (Math.abs(d) <= 10) return '达标 ✓'
   return d > 0 ? `超 ${d}%` : `低 ${-d}%`
 }
+
+// ---- 目标进度:理论缺口(7700 kcal/kg)+ 近 4 周实测速率双轨 ----
+// 减脂 = 完整预测(预计天数/日期);增肌 = 只对照增速建议区间(能量分区个体差异大,
+// 预测到日是假精确);维持模式无进度概念,整块不显示。起点与热量目标半动态同口径:
+// 近 7 天均值,无记录回退档案体重。
+const fmtRate = (kg) => {
+  const v = Math.round(kg * 100) / 100
+  return `${v > 0 ? '+' : ''}${v.toFixed(2)}kg`
+}
+const progressInfo = computed(() => {
+  if (profile.mode === 'maintain') return null
+  if (!profile.targetWeight) {
+    return { placeholder: '在设置 → 身体数据填写目标体重后,这里会显示进度预测' }
+  }
+  const current = weight.recentAvg7 ?? profile.weight
+  const target = profile.targetWeight
+  const isCut = profile.mode === 'cut'
+  const done = isCut ? current <= target : current >= target
+  const theory = theoryProgress({
+    tdee: profile.targets.tdee,
+    kcal: profile.targets.kcal,
+    currentWeight: current,
+    targetWeight: target,
+    today: today.value,
+  })
+  const measured = measuredWeeklyRate(weight.records, today.value)
+  const rows = []
+  if (!done && theory) {
+    rows.push(
+      isCut
+        ? {
+            label: '理论预测',
+            text: `缺口 ${theory.gapKcal} kcal/天 → 约 ${fmtRate(theory.weeklyKg)}/周,预计 ${theory.days} 天后(${friendlyDate(theory.date)})`,
+          }
+        : {
+            label: '理论增速',
+            text: `盈余 ${-theory.gapKcal} kcal/天 → 约 ${fmtRate(theory.weeklyKg)}/周(建议 +0.25~0.5kg)`,
+          },
+    )
+  }
+  if (measured != null) rows.push({ label: '实测速率', text: `近 4 周 ${fmtRate(measured)}/周` })
+  let hint = ''
+  if (!done && theory && measured != null && Math.abs(theory.weeklyKg) >= 0.05) {
+    const ratio = measured / theory.weeklyKg
+    if (Math.abs(ratio - 1) > 0.5) {
+      hint = '实测与理论偏差超过 50%:掉秤/增重过快注意保住蛋白,过慢可检查活动系数与记录完整性'
+    }
+  }
+  return {
+    current: Math.round(current * 10) / 10,
+    target,
+    done,
+    rows,
+    hint,
+  }
+})
 
 // ---- 每日记录数据(供日历标记与详情) ----
 const recordDays = computed(() => {

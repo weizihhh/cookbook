@@ -10,6 +10,7 @@ const defaults = () => ({
   age: 30,
   height: 175,
   weight: 70,
+  targetWeight: null, // 目标体重(kg,选填),记录页进度预测用
   activity: 1.375,
   mode: 'cut',
   macroPreset: 'cut', // 与 MODE_PRESET.cut 一致:新用户首屏即减脂推荐值
