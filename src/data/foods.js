@@ -227,7 +227,51 @@ const ANTI_INFLAMMATORY_IDS = new Set([
   'f_olive_oil', 'f_flaxseed_oil', 'f_walnut', 'f_almond',
 ])
 
-export const FOODS = RAW_FOODS.map((f) => ({ ...f, antiInfl: ANTI_INFLAMMATORY_IDS.has(f.id) }))
+// 膳食纤维(g/100g,总膳食纤维近似值,成分表/USDA 常见值口径,与热量同为近似体系)。
+// 集中声明而非逐行字段:114 条植物性食材;畜禽肉/鱼虾海鲜/蛋/奶/纯油脂不标
+// (默认 0,生理零纤维)。维护规则:新增 grain/vegetable/fruit 类食材必须登记,
+// verify 有覆盖率断言兜底。个别品类各源差异大(如番茄 0.5~1.2),取常用中位。
+const FIBER_BY_ID = {
+  // 谷物主食(干重口径纤维浓缩,薯类鲜重)
+  f_rice: 0.7, f_brown_rice: 3.4, f_millet: 1.6, f_oats: 5.3, f_whole_wheat_flour: 10.8,
+  f_buckwheat_noodle: 3.5, f_pasta: 3.0, f_rice_noodle: 0.6, f_quinoa: 7.0,
+  f_whole_wheat_bread: 6.0, f_steamed_bun: 1.1, f_corn: 2.9, f_sweet_potato: 1.6,
+  f_purple_potato: 1.8, f_potato: 1.1, f_yam: 0.8, f_pumpkin: 0.8,
+  f_black_glutinous_rice: 3.0, f_mung_bean_dry: 6.4, f_red_bean_dry: 7.7, f_taro: 1.0,
+  f_sorghum: 4.3, f_cornmeal: 6.0, f_noodles_dry: 0.7, f_glutinous_rice: 0.8,
+  // 豆制品(蛋奶本身零纤维,豆类干重纤维高)
+  f_soy_milk: 1.1, f_tofu_firm: 0.8, f_tofu_soft: 0.4, f_tofu_dried: 0.8,
+  f_soybean_dry: 15.5, f_chickpea_cooked: 7.6, f_edamame: 4.0, f_yuba: 3.5,
+  f_tofu_sheet: 1.2, f_black_bean_dry: 10.2, f_vegetarian_chicken: 0.9,
+  // 蔬菜菌菇(紫菜/木耳等干制品显著浓缩)
+  f_broccoli: 1.6, f_cauliflower: 2.0, f_spinach: 1.7, f_lettuce: 1.0, f_oleifera: 0.8,
+  f_chinese_cabbage: 0.8, f_baby_cabbage: 0.9, f_celery: 1.2, f_cucumber: 0.5,
+  f_tomato: 1.2, f_bell_pepper: 1.7, f_asparagus: 1.9, f_shiitake: 3.3, f_mushroom: 2.5,
+  f_enoki: 2.7, f_king_oyster: 2.1, f_oyster_mushroom: 2.3, f_eggplant: 1.3,
+  f_green_bean: 1.5, f_okra: 3.0, f_wax_gourd: 0.7, f_carrot: 1.1, f_white_radish: 1.0,
+  f_chinese_chive: 1.4, f_cabbage: 1.0, f_loofah: 0.6, f_water_spinach: 1.4,
+  f_zucchini: 0.6, f_mung_bean_sprout: 0.8, f_wood_ear: 2.6, f_kelp: 0.5, f_laver: 21.6,
+  f_shepherd_s_purse: 1.7, f_chrysanthemum_greens: 1.2, f_lotus_root: 1.2,
+  f_bitter_melon: 1.4, f_water_bamboo: 1.9, f_konjac: 2.5, f_bok_choy: 1.1,
+  f_celtuce: 0.6, f_garlic_sprout: 2.5, f_snow_pea: 2.6, f_onion: 0.9,
+  f_green_pepper: 1.4, f_soybean_sprout: 1.5, f_amaranth: 2.2,
+  // 水果
+  f_apple: 1.2, f_banana: 1.2, f_orange: 0.6, f_blueberry: 2.4, f_strawberry: 1.1,
+  f_kiwi: 2.6, f_grape: 0.4, f_pear: 3.1, f_peach: 1.3, f_cherry_tomato: 1.8,
+  f_pomelo: 0.4, f_watermelon: 0.3, f_hami_melon: 0.2, f_cherry: 0.3,
+  f_fresh_jujube: 1.9, f_pineapple: 1.3, f_dragon_fruit: 1.6, f_lychee: 0.5,
+  f_avocado: 6.7, f_mango: 1.3, f_papaya: 0.8, f_persimmon: 1.4, f_mandarin: 0.7,
+  f_pomegranate: 4.8,
+  // 坚果种子(纯油脂不标)
+  f_almond: 12.5, f_walnut: 9.5, f_peanut: 5.5, f_cashew: 3.3, f_black_sesame: 14.0,
+  f_pistachio: 10.6, f_pumpkin_seed: 6.5,
+}
+
+export const FOODS = RAW_FOODS.map((f) => ({
+  ...f,
+  antiInfl: ANTI_INFLAMMATORY_IDS.has(f.id),
+  ...(FIBER_BY_ID[f.id] != null ? { fiber: FIBER_BY_ID[f.id] } : {}),
+}))
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
 

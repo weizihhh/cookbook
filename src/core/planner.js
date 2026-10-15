@@ -39,7 +39,7 @@ const r1 = (v) => Math.round(v * 10) / 10
 /** 按 ingredients(含克数)累加营养。克数为购买量口径,带壳/带骨食材(edible<1)
  *  先折算到可食部再乘每百克营养值 */
 export function computeNutrition(ingredients, foods) {
-  const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  const total = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   for (const ing of ingredients) {
     const f = foods[ing.foodId]
     if (!f) continue
@@ -48,12 +48,14 @@ export function computeNutrition(ingredients, foods) {
     total.protein += f.protein * k
     total.carbs += f.carbs * k
     total.fat += f.fat * k
+    total.fiber += (f.fiber ?? 0) * k
   }
   return {
     kcal: Math.round(total.kcal),
     protein: r1(total.protein),
     carbs: r1(total.carbs),
     fat: r1(total.fat),
+    fiber: r1(total.fiber),
   }
 }
 
@@ -525,7 +527,7 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
  */
 export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
   const skip = new Set(skipMealKeys)
-  const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
     if (skip.has(mealKey)) continue
     for (const item of dayPlan.meals[mealKey] || []) {
@@ -535,12 +537,14 @@ export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
       totals.protein += n.protein
       totals.carbs += n.carbs
       totals.fat += n.fat
+      totals.fiber += n.fiber
     }
   }
   totals.kcal = Math.round(totals.kcal)
   totals.protein = r1(totals.protein)
   totals.carbs = r1(totals.carbs)
   totals.fat = r1(totals.fat)
+  totals.fiber = r1(totals.fiber)
 
   const diffPct = (actual, goal) =>
     goal > 0 ? Math.round(((actual - goal) / goal) * 100) : 0

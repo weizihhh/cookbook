@@ -314,23 +314,27 @@ const label100g = `营养成分表
 蛋白质 8.0克 13%
 脂肪 15.2克 25%
 碳水化合物 62.0克 21%
+膳食纤维 6.0克 24%
 钠 400毫克 20%`
 const p1 = parseNutritionLabel(label100g)
 check('成分表:识别每100g口径', p1?.basis === '100g', JSON.stringify(p1))
 check('成分表:能量/三大营养素提取(NRV% 不干扰)', p1?.energyKj === 1600 && p1?.protein === 8 && p1?.carbs === 62 && p1?.fat === 15.2, JSON.stringify(p1))
+check('成分表:膳食纤维行提取(v0.22.0)', p1?.fiber === 6, JSON.stringify(p1))
 check('kJ→kcal 换算', kjToKcal(1600) === 382.4, `got ${kjToKcal(1600)}`)
 const n1 = normalizeTo100g(p1)
-check('每100g 归一不改变数值', n1.kcal === 382.4 && n1.protein === 8 && n1.fat === 15.2)
+check('每100g 归一不改变数值', n1.kcal === 382.4 && n1.protein === 8 && n1.fat === 15.2 && n1.fiber === 6)
 
 const labelServe = `营养成分表 每份30g
 能量 500kJ 6%
 蛋白质 3.0g 5%
 脂肪 4.5g 8%
-碳水化合物 22.5g 8%`
+碳水化合物 22.5g 8%
+膳食纤维 1.5克 6%`
 const p2 = parseNutritionLabel(labelServe)
 check('成分表:识别每份口径与克数', p2?.basis === 'perServe' && p2?.perServeGrams === 30, JSON.stringify(p2))
 const n2 = normalizeTo100g(p2)
 check('每份30g 归一到每100g(×100/30)', n2?.protein === 10 && n2?.carbs === 75 && n2?.fat === 15 && n2?.kcal === 398.3, JSON.stringify(n2))
+check('每份纤维同系数换算(1.5→5.0)', n2?.fiber === 5, JSON.stringify(n2))
 const p2b = parseNutritionLabel('每份\n能量 500kJ\n蛋白质 3.0g\n脂肪 4.5g\n碳水化合物 22.5g')
 check('每份缺克数时归一返回 null(走人工补填)', normalizeTo100g(p2b) === null && normalizeTo100g(p2b, 25)?.protein === 12)
 
@@ -816,6 +820,35 @@ check('recommendMeals:候选营养落在预算宽松带(0.4~1.6×)且食谱 id �
 // 端到端守卫:全池为空时返回空数组(而非崩在空池/产出空组合)
 const recNone = recommendMeals({ recipes: [], foods: FOODS_MAP, kcal: 400, protein: 30, mealKey: 'dinner', excludedTags: [] })
 check('recommendMeals:候选池全空时返回空数组', recNone.length === 0, `got ${recNone.length}`)
+
+// ---------- 29. v0.22.0 膳食纤维建模 ----------
+// 覆盖率:grain/vegetable/fruit 三类必须有 fiber 声明(新增食材漏登记在这里红);
+// 动物性(肉/鱼虾)不声明(默认 0,生理零纤维)
+const fiberMissing = FOODS.filter((f) => ['grain', 'vegetable', 'fruit'].includes(f.category) && f.fiber == null)
+check('fiber:谷物/蔬菜/水果三类覆盖率 100%', fiberMissing.length === 0, fiberMissing.map((f) => f.id).join(','))
+const fiberLeak = FOODS.filter((f) => ['meat', 'seafood'].includes(f.category) && f.fiber != null)
+check('fiber:动物性食材不声明(生理零纤维)', fiberLeak.length === 0, fiberLeak.map((f) => f.id).join(','))
+
+// 营养计算锚点:50g 燕麦=2.7g(5.3×0.5);纯动物零;玉米食部折算(2.9×0.46=1.334→1.3)
+const oatFiber = computeNutrition([{ foodId: 'f_oats', grams: 50, scalable: true }], FOODS_MAP).fiber
+check('fiber 锚点:50g 燕麦片=2.7g', oatFiber === 2.7, `got ${oatFiber}`)
+const eggFiber = computeNutrition([{ foodId: 'f_egg', grams: 100, scalable: true }], FOODS_MAP).fiber
+check('fiber 锚点:动物食材为零', eggFiber === 0, `got ${eggFiber}`)
+const cornFiber = computeNutrition([{ foodId: 'f_corn', grams: 100, scalable: true }], FOODS_MAP).fiber
+check('fiber:食部折算与热量同口径(带壳玉米 100g=1.3g)', cornFiber === 1.3, `got ${cornFiber}`)
+
+// 抗炎派生纤维条件(基准份纤维 ≥4g):全麦馒头/魔芋/秋葵/黑豆浆等高纤餐补标;
+// 紫菜汤纤维 1.08g 翻不了案(v0.16.3 摘标决策维持)
+for (const [id, expect] of [
+  ['r_homemade_whole_wheat_bun', true],
+  ['r_konjac_cucumber', true],
+  ['r_okra_blanched', true],
+  ['r_whole_wheat_bread_slice', true],
+  ['r_black_bean_milk', true],
+  ['r_laver_soup', false],
+]) {
+  check(`抗炎派生:纤维条件判定 ${id} → ${expect}`, RECIPES_MAP[id]?.antiInfl === expect)
+}
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

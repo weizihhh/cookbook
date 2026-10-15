@@ -41,7 +41,7 @@
         </van-cell-group>
       </van-tab>
       <van-tab title="食材库">
-        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪,每 100g 含量(g)</div>
+        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪 · 纤=膳食纤维,每 100g 含量(g)</div>
         <van-cell-group
           v-for="g in foodGroups"
           :key="g.value"
@@ -62,14 +62,14 @@
             </template>
             <template #value>
               <div>{{ f.kcal }} 千卡</div>
-              <div class="sub">P{{ f.protein }} · C{{ f.carbs }} · F{{ f.fat }}</div>
+              <div class="sub">P{{ f.protein }} · C{{ f.carbs }} · F{{ f.fat }} · 纤{{ f.fiber ?? 0 }}</div>
             </template>
           </van-cell>
         </van-cell-group>
         <van-empty v-if="!foodGroups.length" image-size="60" description="没有匹配的食材" />
       </van-tab>
       <van-tab :title="`自定义${customFoods.foods.length ? '(' + customFoods.foods.length + ')' : ''}`">
-        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪,每 100g 含量(g)</div>
+        <div class="pcf-legend">P=蛋白质 · C=碳水 · F=脂肪 · 纤=膳食纤维,每 100g 含量(g)</div>
         <div class="custom-actions">
           <van-button size="small" type="primary" @click="openImport">📷 拍照导入</van-button>
           <van-button size="small" type="primary" plain @click="openImport">手动添加</van-button>
@@ -103,7 +103,7 @@
             </template>
             <template #value>
               <div>{{ f.kcal }} 千卡</div>
-              <div class="sub">P{{ f.protein }} · C{{ f.carbs }} · F{{ f.fat }}</div>
+              <div class="sub">P{{ f.protein }} · C{{ f.carbs }} · F{{ f.fat }} · 纤{{ f.fiber ?? 0 }}</div>
             </template>
           </van-cell>
           <van-empty
@@ -127,6 +127,7 @@
           <div><div class="num">{{ baseNutrition(current).protein }}g</div><div class="label">蛋白质</div></div>
           <div><div class="num">{{ baseNutrition(current).carbs }}g</div><div class="label">碳水</div></div>
           <div><div class="num">{{ baseNutrition(current).fat }}g</div><div class="label">脂肪</div></div>
+          <div><div class="num">{{ baseNutrition(current).fiber }}g</div><div class="label">膳食纤维</div></div>
         </div>
         <van-cell title="食材用量(基准份)" />
         <van-cell
@@ -188,6 +189,9 @@
           <template #right-icon><span class="field-unit">g/100g</span></template>
         </van-field>
         <van-field v-model.number="form.carbs" type="number" label="碳水">
+          <template #right-icon><span class="field-unit">g/100g</span></template>
+        </van-field>
+        <van-field v-model.number="form.fiber" type="number" label="膳食纤维" placeholder="可选">
           <template #right-icon><span class="field-unit">g/100g</span></template>
         </van-field>
         <div class="unit-row">
@@ -327,6 +331,7 @@ const form = reactive({
   protein: null,
   carbs: null,
   fat: null,
+  fiber: null,
   unit: '',
   unitGrams: null,
 })
@@ -338,7 +343,7 @@ const sourceColumns = computed(() => [
 
 function resetForm() {
   Object.assign(form, {
-    id: null, name: '', source: '', kcal: null, protein: null, carbs: null, fat: null, unit: '', unitGrams: null,
+    id: null, name: '', source: '', kcal: null, protein: null, carbs: null, fat: null, fiber: null, unit: '', unitGrams: null,
   })
   if (photoUrl.value) {
     URL.revokeObjectURL(photoUrl.value)
@@ -362,6 +367,7 @@ function openEdit(f) {
     protein: f.protein,
     carbs: f.carbs,
     fat: f.fat,
+    fiber: f.fiber ?? null,
     unit: f.unit || '',
     unitGrams: f.unitGrams ?? null,
   })
@@ -388,6 +394,7 @@ async function onImage(e) {
       if (norm.protein != null) form.protein = norm.protein
       if (norm.carbs != null) form.carbs = norm.carbs
       if (norm.fat != null) form.fat = norm.fat
+      if (norm.fiber != null) form.fiber = norm.fiber
       ocrHint.value =
         parsed.basis === 'perServe'
           ? `已按每份 ${parsed.perServeGrams}g 换算为每 100g 数值`
@@ -441,12 +448,17 @@ function saveCustom() {
   const protein = Number(form.protein)
   const carbs = Number(form.carbs)
   const fat = Number(form.fat)
+  const fiber = form.fiber == null || form.fiber === '' ? null : Number(form.fiber)
   if (!(kcal >= 0 && kcal <= 1000)) {
     showToast('能量请填 0-1000(每 100g 千卡)')
     return
   }
   if ([protein, carbs, fat].some((v) => !(v >= 0 && v <= 100))) {
     showToast('蛋白/碳水/脂肪请填 0-100(每 100g 克数)')
+    return
+  }
+  if (fiber != null && !(fiber >= 0 && fiber <= 80)) {
+    showToast('膳食纤维请填 0-80(每 100g 克数)')
     return
   }
   if (!!form.unit !== !!form.unitGrams) {
@@ -466,6 +478,7 @@ function saveCustom() {
     protein: r1(protein),
     carbs: r1(carbs),
     fat: r1(fat),
+    ...(fiber != null ? { fiber: r1(fiber) } : {}),
     ...(form.unit ? { unit: form.unit.trim(), unitGrams: r1(form.unitGrams) } : {}),
     ...(exist?.createdAt != null ? { createdAt: exist.createdAt } : { createdAt: Date.now() }),
   })

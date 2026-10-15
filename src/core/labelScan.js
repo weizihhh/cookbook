@@ -80,13 +80,15 @@ export function parseNutritionLabel(text) {
   const fat =
     pick(lines, (l) => l.includes('脂肪') && !/饱和|反式/.test(l)) ??
     pick(lines, (l) => /饱和脂肪/.test(l))
+  // 膳食纤维:国标成分表常见行,可不出现;不参与"至少 3 项"有效性判定
+  const fiber = pick(lines, (l) => l.includes('膳食纤维'))
 
   const hits = [energyKj != null || energyKcal != null, protein != null, carbs != null, fat != null].filter(
     Boolean
   ).length
   if (hits < 3) return null
 
-  return { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat }
+  return { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat, fiber }
 }
 
 /**
@@ -109,5 +111,6 @@ export function normalizeTo100g(parsed, serveGramsOverride = null) {
     protein: r1(parsed.protein),
     carbs: r1(parsed.carbs),
     fat: r1(parsed.fat),
+    fiber: r1(parsed.fiber),
   }
 }

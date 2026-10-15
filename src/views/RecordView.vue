@@ -81,6 +81,15 @@
               <i :class="pctClass(dietStats.proteinPct)">{{ pctText(dietStats.proteinPct) }}</i>
             </span>
           </div>
+          <div class="diet-row">
+            <span class="diet-label">日均纤维</span>
+            <span class="diet-val">
+              <b>{{ dietStats.fiber }}</b> / 25 g
+              <i :class="dietStats.fiber >= 25 ? 'ok' : 'under'">
+                {{ dietStats.fiber >= 25 ? '达标 ✓' : `还差 ${25 - dietStats.fiber}g` }}
+              </i>
+            </span>
+          </div>
           <div v-if="dietStats.weightChange != null" class="diet-row">
             <span class="diet-label">区间体重</span>
             <span class="diet-val" :class="dietStats.weightChange <= 0 ? 'ok' : 'over'">
@@ -215,7 +224,7 @@
           </span>
         </div>
         <div v-if="selectedData" class="detail-macros">
-          蛋白 {{ selectedData.totals.protein }}g · 碳水 {{ selectedData.totals.carbs }}g · 脂肪 {{ selectedData.totals.fat }}g
+          蛋白 {{ selectedData.totals.protein }}g · 碳水 {{ selectedData.totals.carbs }}g · 脂肪 {{ selectedData.totals.fat }}g · 纤维 {{ selectedData.totals.fiber }}g
         </div>
         <template v-if="selectedData">
           <div v-for="meal in MEALS" :key="meal.key" class="meal-block">
@@ -333,6 +342,7 @@ const dietStats = computed(() => {
   let recorded = 0
   let kcalSum = 0
   let proteinSum = 0
+  let fiberSum = 0
   for (const d of days) {
     const meals = week.days[d]
     if (!meals) continue
@@ -343,11 +353,13 @@ const dietStats = computed(() => {
     const s = summarizeIntake({ date: d, meals }, FOODS_MAP, profile.targets, skipped)
     kcalSum += s.totals.kcal
     proteinSum += s.totals.protein
+    fiberSum += s.totals.fiber
   }
   const tg = profile.targets
   const pctOf = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0)
   const kcal = recorded ? Math.round(kcalSum / recorded) : 0
   const protein = recorded ? Math.round(proteinSum / recorded) : 0
+  const fiber = recorded ? Math.round(fiberSum / recorded) : 0
   // 区间内体重变化(首尾对照,≥2 次称重才有意义)
   const inRange = weight.records.filter((r) => trendDays.value.includes(r.date))
   return {
@@ -359,6 +371,7 @@ const dietStats = computed(() => {
     protein,
     proteinTarget: Math.round(tg.protein),
     proteinPct: pctOf(protein, tg.protein),
+    fiber,
     weightChange: inRange.length >= 2 ? inRange[inRange.length - 1].kg - inRange[0].kg : null,
     weightCount: inRange.length,
   }
@@ -436,7 +449,7 @@ const recordDays = computed(() => {
   const out = []
   for (const [date, meals] of Object.entries(week.days)) {
     if (!meals) continue
-    const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
     let has = false
     for (const m of MEALS) {
       for (const it of meals[m.key] || []) {
@@ -447,6 +460,7 @@ const recordDays = computed(() => {
         totals.protein += n.protein
         totals.carbs += n.carbs
         totals.fat += n.fat
+        totals.fiber += n.fiber
       }
     }
     if (!has) continue
@@ -458,6 +472,7 @@ const recordDays = computed(() => {
         protein: Math.round(totals.protein),
         carbs: Math.round(totals.carbs),
         fat: Math.round(totals.fat),
+        fiber: Math.round(totals.fiber),
       },
       doneCount: MEALS.filter((m) => checkin.statusOf(date, m.key) === 'done').length,
     })

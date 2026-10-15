@@ -17,6 +17,7 @@
         <div><div class="num">{{ nutrition.protein }}g</div><div class="label">蛋白质</div></div>
         <div><div class="num">{{ nutrition.carbs }}g</div><div class="label">碳水</div></div>
         <div><div class="num">{{ nutrition.fat }}g</div><div class="label">脂肪</div></div>
+        <div><div class="num">{{ nutrition.fiber }}g</div><div class="label">膳食纤维</div></div>
       </div>
       <van-cell title="食材用量" />
       <van-cell v-for="ing in item.ingredients" :key="ing.foodId">

@@ -1071,8 +1071,9 @@ const RAW_RECIPES = [
 ]
 
 // 食谱抗炎派生:含 ≥2 种非油抗炎食材,或含 ≥80g 非油抗炎主料(如 200g 西兰花
-// 单品)即标注。油类不计入"种数"——否则"5g 紫菜 + 2g 油"也凑成两种,标签失去
-// 区分度(紫菜汤曾因此误标)
+// 单品),或基准份膳食纤维 ≥4g(全谷物主食/魔芋/秋葵等高纤餐,DII 中膳食纤维
+// 为明确抗炎成分,v0.22.0 引入)即标注。油类不计入"种数"——否则"5g 紫菜 + 2g 油"
+// 也凑成两种,标签失去区分度(紫菜汤曾因此误标;纤维条件 1.08g 同样翻不了案)
 const OIL_IDS = new Set(['f_olive_oil', 'f_peanut_oil', 'f_flaxseed_oil'])
 
 export const RECIPES = RAW_RECIPES.map((r) => {
@@ -1080,7 +1081,11 @@ export const RECIPES = RAW_RECIPES.map((r) => {
     (i) => FOODS_MAP[i.foodId]?.antiInfl && !OIL_IDS.has(i.foodId)
   )
   const mainAntiGrams = antiIngs.reduce((s, i) => s + i.grams, 0)
-  return { ...r, antiInfl: antiIngs.length >= 2 || mainAntiGrams >= 80 }
+  const fiberGrams = r.ingredients.reduce((s, i) => {
+    const f = FOODS_MAP[i.foodId]
+    return s + ((f?.fiber ?? 0) * i.grams * (f?.edible ?? 1)) / 100
+  }, 0)
+  return { ...r, antiInfl: antiIngs.length >= 2 || mainAntiGrams >= 80 || fiberGrams >= 4 }
 })
 
 export const RECIPES_MAP = Object.fromEntries(RECIPES.map((r) => [r.id, r]))

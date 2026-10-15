@@ -31,6 +31,7 @@
         <div><div class="num">{{ nutrition.protein }}g</div><div class="label">蛋白质</div></div>
         <div><div class="num">{{ nutrition.carbs }}g</div><div class="label">碳水</div></div>
         <div><div class="num">{{ nutrition.fat }}g</div><div class="label">脂肪</div></div>
+        <div><div class="num">{{ nutrition.fiber }}g</div><div class="label">膳食纤维</div></div>
       </div>
       <div style="display: flex; gap: 10px; margin: 12px 0">
         <van-button block @click="$emit('update:show', false)">取消</van-button>

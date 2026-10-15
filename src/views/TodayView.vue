@@ -313,27 +313,38 @@ const mealActuals = computed(() => {
 // 顶部合计按"已吃"口径:跳过的餐次不计入(打卡 skip 表示没吃这餐)。
 // 实现下沉到 summarizeIntake(skipMealKeys),与记录页统计共用同一口径
 const totals = computed(() => {
-  if (!todayMeals.value) return { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  if (!todayMeals.value) return { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   const skipped = MEALS.filter((m) => mealActuals.value[m.key].skipped).map((m) => m.key)
   const s = summarizeIntake({ date: today.value, meals: todayMeals.value }, FOODS_MAP, targets.value, skipped).totals
   return { ...s, protein: Math.round(s.protein) }
 })
 const hasSkippedMeal = computed(() => MEALS.some((m) => mealActuals.value[m.key]?.skipped))
 
-// 三大营养素逐行展示:实际/目标 + 进度条 + 达标状态;±10% 内视为达标(与热量口径一致)
+// 三大营养素逐行展示:实际/目标 + 进度条 + 达标状态;±10% 内视为达标(与热量口径一致)。
+// 膳食纤维为第四行但走"参考值"口径:指南 25-30g/天,只对照固定 25g,不套 ±10%
 const MACRO_META = [
   { key: 'protein', label: '蛋白质', color: '#00b578' },
   { key: 'carbs', label: '碳水', color: '#1989fa' },
   { key: 'fat', label: '脂肪', color: '#ff976a' },
+  { key: 'fiber', label: '膳食纤维', color: '#7a5af8', fixedTarget: 25 },
 ]
 const macroRows = computed(() =>
   MACRO_META.map((meta) => {
     const actual = totals.value[meta.key] ?? 0
-    const target = targets.value[meta.key] || 0
+    const target = meta.fixedTarget ?? (targets.value[meta.key] || 0)
     const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0
     let statusClass = 'none'
     let statusText = '—'
-    if (hasAnyItem.value && !allSkipped.value && target > 0) {
+    if (meta.key === 'fiber') {
+      if (hasAnyItem.value && !allSkipped.value && target > 0) {
+        if (actual >= target) {
+          statusClass = 'ok'
+          statusText = '达标 ✓'
+        } else {
+          statusText = `还差 ${Math.ceil(target - actual)}g`
+        }
+      }
+    } else if (hasAnyItem.value && !allSkipped.value && target > 0) {
       const d = Math.round(((actual - target) / target) * 100)
       if (Math.abs(d) <= 10) {
         statusClass = 'ok'
