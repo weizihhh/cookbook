@@ -110,6 +110,10 @@
 - **.npmrc legacy-peer-deps**(v0.20.2):vue-router 5.1+ 对 vite 声明了可选 peer
   ^7+,与项目 vite 6 形式冲突(其 vite 插件本项目未使用,运行时无影响);跳过
   peer 检查以避免每次装依赖 ERESOLVE,将来升级 vite 7 后可移除。
+- **SW 缓存版本自动化**(v0.20.3):build 命令追加 scripts/sw-cache.mjs,构建后
+  以 index.html 引用的主 chunk 哈希重写 dist/sw.js 的 CACHE——内容变则缓存名
+  变,activate 自清旧缓存,发版零纪律成本(评审 v6 F-6);public/sw.js 中的
+  常量值仅为源码占位。
 - **自定义食物启动时注册**(v0.20.2):customFoods.sync() 在 main.js 启动时执行
   一次(幂等),不再依赖各视图 setup 里调用,消除"视图漏挂载则注册缺失"的
   隐式契约(评审 v6 F-7)。

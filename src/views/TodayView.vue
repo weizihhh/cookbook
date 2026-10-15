@@ -211,7 +211,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
 import { SLOT_LABELS, computeNutrition, summarizeIntake, recentFoodDays, weeklyLimitHits } from '../core/planner'
@@ -465,6 +465,12 @@ function doCopyYesterday(mealKey, mode) {
 
 // ---- 体重 ----
 const weightInput = ref(weight.kgOf(today.value) != null ? String(weight.kgOf(today.value)) : '')
+// 跨零点跟随:today 刷新后输入框重置为新当天已记值,防止次日直接点"记录"
+// 把昨天显示的旧值写进新日期
+watch(today, (t) => {
+  const kg = weight.kgOf(t)
+  weightInput.value = kg != null ? String(kg) : ''
+})
 
 function logWeight() {
   const kg = Number(weightInput.value)

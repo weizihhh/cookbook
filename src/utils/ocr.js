@@ -3,8 +3,21 @@
 // 仅在实际拍照导入时才动态加载识别组件;wasm 核心与中文语言包(chi_sim)
 // 首次使用时从 CDN 下载(约 10-25MB),之后走浏览器缓存,离线可用。
 // 离线/下载失败时不阻塞主流程 —— 调用方退化为"看照片手填"。
+// 识别结束后空闲 3 分钟自动 terminate(评审 v6 F-3):wasm 实例几十 MB,
+// 手机端常驻后台有内存压力;重建时 wasm/语言包走 HTTP 缓存,秒级恢复。
 
 let workerPromise = null
+let idleTimer = null
+
+function scheduleRelease() {
+  clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    idleTimer = null
+    const p = workerPromise
+    workerPromise = null // 先置空再终止:期间的新任务会另建 worker,不会拿到正被销毁的实例
+    p?.then((w) => w.terminate()).catch(() => {})
+  }, 3 * 60 * 1000)
+}
 
 async function getWorker(onStatus) {
   if (!workerPromise) {
@@ -55,8 +68,13 @@ async function downscale(file, maxSide = 2000) {
 
 /** 识别图片文字,返回纯文本(不在此处做任何字段解析) */
 export async function scanImageText(file, onStatus) {
+  clearTimeout(idleTimer) // 使用中,取消待执行的空闲释放
   const worker = await getWorker(onStatus)
   const image = await downscale(file)
-  const { data } = await worker.recognize(image)
-  return data.text || ''
+  try {
+    const { data } = await worker.recognize(image)
+    return data.text || ''
+  } finally {
+    scheduleRelease() // 成败都排释放,失败路径不留常驻 worker
+  }
 }

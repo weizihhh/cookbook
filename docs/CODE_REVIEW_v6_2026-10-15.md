@@ -222,4 +222,7 @@ import 的函数式组件,若按原方案"删全量 CSS + 按需"而不补样式
 - F-4:storage.js 死代码 todayStr 已删(verify.mjs 用的是 date.js 版,不受影响)
 - F-7:customFoods.sync() 移至 main.js 启动时,三处视图调用及 TodayView/
   RecordView 中已无他用的 store 引用一并清理
-- F-3 / F-6 / F-8:维持登记不落地(F-6 的 CACHE 随本次发版按流程手 bump 至 v3)
+- F-3 / F-6 / F-8:原定登记不落地,后经确认于 v0.20.3 收掉——F-3 识别结束后
+  空闲 3 分钟自动 terminate(wasm/语言包走 HTTP 缓存,重建秒级);F-6 build 命令
+  追加 scripts/sw-cache.mjs,以主 chunk 哈希自动重写 dist/sw.js 的 CACHE,
+  无需手动 bump;F-8 体重输入框 watch(today) 跨零点重置为新当天已记值

@@ -2,7 +2,8 @@
 // 策略:
 // - 导航请求 network-first:优先拿新版 index.html,断网时回退缓存壳
 // - 静态资源(哈希文件名的 js/css/图标)cache-first:内容寻址永不变化,缓存命中即离线可用
-// - 发新版本流程:发布新构建后改 CACHE 版本号,activate 阶段清掉旧缓存
+// - 发新版本流程:构建脚本(scripts/sw-cache.mjs)以主 chunk 哈希自动重写
+//   dist 里 sw.js 的 CACHE,activate 阶段清掉旧缓存,无需手动 bump 版本号
 // 注:OCR 语言包走 CDN(跨域)不缓存,首次离线时拍照导入不可用,属已知取舍
 const CACHE = 'cookbook-shell-v3'
 const SHELL = [
