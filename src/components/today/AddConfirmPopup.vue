@@ -23,6 +23,9 @@
           <FoodStepper :food-id="ing.foodId" :grams="ing.grams" @change="(g) => (ing.grams = Math.round(g))" />
         </template>
       </van-cell>
+      <div v-for="h in limitHits" :key="h.name" class="limit-hint">
+        {{ h.name }}:近 7 天已出现 {{ h.count }} 天,已达建议上限(≤{{ h.limit }} 次/周),不建议再加
+      </div>
       <div class="nutri-grid" style="margin: 10px 0">
         <div><div class="num">{{ nutrition.kcal }}</div><div class="label">千卡</div></div>
         <div><div class="num">{{ nutrition.protein }}g</div><div class="label">蛋白质</div></div>
@@ -47,6 +50,7 @@ import FoodStepper from './FoodStepper.vue'
 const props = defineProps({
   show: { type: Boolean, default: false },
   draft: { type: Object, default: null },
+  limitHits: { type: Array, default: () => [] },
 })
 defineEmits(['update:show', 'confirm'])
 
@@ -66,6 +70,14 @@ function unitOf(foodId) {
 .unit-hint {
   font-size: 11px;
   color: var(--cb-primary);
+}
+.limit-hint {
+  font-size: 12px;
+  color: #ee0a24;
+  background: #fff1f1;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 4px;
 }
 .detail {
   padding: 16px;

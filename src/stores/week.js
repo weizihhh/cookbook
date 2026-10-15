@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodDays } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
@@ -74,6 +74,8 @@ export const useWeekStore = defineStore('week', {
         targets: profile.targets,
         excludedTags: profile.excludedTags,
         date,
+        // 近 7 天食材频次(猪肝维A/金枪鱼汞等 weeklyLimit),生成端规避超限
+        foodDayCounts: recentFoodDays(this.days, date),
       }).meals
       const keep = new Set(keepMealKeys)
       for (const mealKey of keep) {
@@ -137,6 +139,7 @@ export const useWeekStore = defineStore('week', {
         excludedTags: profile.excludedTags,
         usedIds,
         stapleKcal: Math.max(80, target.kcal - othersKcal),
+        foodDayCounts: recentFoodDays(this.days, date),
       })
       if (!next) return false
       meals[mealKey][idx] = next

@@ -57,6 +57,7 @@
             <template #label>
               每 100g
               <span v-if="f.unit" class="unit-hint">· 1{{ f.unit }}≈{{ f.unitGrams }}g</span>
+              <span v-if="f.weeklyLimit" class="unit-hint">· 建议 ≤{{ f.weeklyLimit }} 次/周</span>
               <van-tag v-if="f.antiInfl" color="var(--cb-primary)" size="medium" style="margin-left: 2px">抗炎</van-tag>
             </template>
             <template #value>

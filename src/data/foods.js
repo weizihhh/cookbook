@@ -7,6 +7,8 @@
 // (官方牡蛎条目按蚝肉计食部 100%,故不标)。未标注 = 100% 可食。
 // 名称限定词((去皮)/(瘦)/(生)/(干)…)只标注官方条目名可核实的口径;
 // 不带限定 ≠ 默认全可食/某种部位——如"鸡胸肉"官方条目未区分去皮,不断定则不加。
+// weeklyLimit(建议 ≤N 次/周):猪肝/鸡肝维生素 A 高、金枪鱼(水浸)汞暴露需控频,
+// 为常见膳食建议的保守近似(生活方式参考非医疗建议);约束按"近 7 天出现过的天数"计。
 // 调味料(盐/生抽等)用量小不计入营养,写在食谱做法步骤中。
 
 export const FOOD_CATEGORIES = [
@@ -59,8 +61,8 @@ const RAW_FOODS = [
   { id: 'f_pork_leg', name: '猪腿肉(瘦)', category: 'meat', kcal: 143, protein: 20.0, carbs: 1.0, fat: 6.5 },
   { id: 'f_lamb_lean', name: '羊肉(瘦)', category: 'meat', kcal: 118, protein: 20.5, carbs: 0.2, fat: 3.9 },
   { id: 'f_duck_breast', name: '鸭胸肉(去皮)', category: 'meat', kcal: 133, protein: 18.0, carbs: 0, fat: 6.0 },
-  { id: 'f_pork_liver', name: '猪肝', category: 'meat', kcal: 129, protein: 19.3, carbs: 4.0, fat: 3.5 },
-  { id: 'f_chicken_liver', name: '鸡肝', category: 'meat', kcal: 121, protein: 16.6, carbs: 2.8, fat: 4.8 },
+  { id: 'f_pork_liver', name: '猪肝', category: 'meat', kcal: 129, protein: 19.3, carbs: 4.0, fat: 3.5, weeklyLimit: 1 },
+  { id: 'f_chicken_liver', name: '鸡肝', category: 'meat', kcal: 121, protein: 16.6, carbs: 2.8, fat: 4.8, weeklyLimit: 1 },
   { id: 'f_beef_brisket', name: '牛腩', category: 'meat', kcal: 332, protein: 17.1, carbs: 0, fat: 29.3 },
   { id: 'f_pork_ribs', name: '猪肋排', category: 'meat', kcal: 270, protein: 17.0, carbs: 0.7, fat: 21.0, edible: 0.72 },
   { id: 'f_beef_tenderloin', name: '牛里脊', category: 'meat', kcal: 113, protein: 22.0, carbs: 1.0, fat: 3.0 },
@@ -75,7 +77,7 @@ const RAW_FOODS = [
   { id: 'f_shrimp', name: '基围虾', category: 'seafood', kcal: 101, protein: 18.2, carbs: 3.9, fat: 1.4, unit: '只', unitGrams: 10, edible: 0.60 },
   { id: 'f_squid', name: '鱿鱼', category: 'seafood', kcal: 84, protein: 17.4, carbs: 0, fat: 1.6 },
   { id: 'f_clam', name: '蛤蜊', category: 'seafood', kcal: 62, protein: 10.1, carbs: 2.8, fat: 1.1, edible: 0.40 },
-  { id: 'f_tuna_canned', name: '金枪鱼(水浸)', category: 'seafood', kcal: 108, protein: 24.0, carbs: 0, fat: 1.0 },
+  { id: 'f_tuna_canned', name: '金枪鱼(水浸)', category: 'seafood', kcal: 108, protein: 24.0, carbs: 0, fat: 1.0, weeklyLimit: 2 },
   { id: 'f_dried_small_shrimp', name: '虾皮', category: 'seafood', kcal: 153, protein: 30.7, carbs: 2.5, fat: 2.2 },
   { id: 'f_razor_clam', name: '蛏子', category: 'seafood', kcal: 40, protein: 7.3, carbs: 2.1, fat: 0.3, edible: 0.57 },
   { id: 'f_oyster', name: '生蚝', category: 'seafood', kcal: 73, protein: 5.3, carbs: 8.2, fat: 2.1 },

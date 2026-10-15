@@ -116,6 +116,48 @@ export function filterCandidates(recipes, { slot, meal, excludedTags = [] }) {
   )
 }
 
+/**
+ * 近 windowDays 个日历日内各食材"出现过的天数"(同一天多餐只计 1 天,
+ * 生成/手动添加都算——健康暴露只看事实)。健康频次约束(weeklyLimit)的计数口径。
+ */
+export function recentFoodDays(days, today, windowDays = 7) {
+  const from = addDays(today, -(windowDays - 1))
+  const counts = {}
+  for (const [date, meals] of Object.entries(days)) {
+    if (date < from || date > today) continue
+    const seen = new Set()
+    for (const items of Object.values(meals || {})) {
+      for (const it of items || []) {
+        if (!it) continue
+        for (const ing of it.ingredients) seen.add(ing.foodId)
+      }
+    }
+    for (const id of seen) counts[id] = (counts[id] || 0) + 1
+  }
+  return counts
+}
+
+/** 食谱是否含"近 7 天已达建议上限"的食材。频次约束不参与池空回退:
+ *  健康约束宁缺不破(蛋白池 51 候选中受控食谱仅 2 个,空槽概率可忽略) */
+function overLimit(recipe, foods, foodDayCounts) {
+  return recipe.ingredients.some((ing) => {
+    const f = foods[ing.foodId]
+    return f?.weeklyLimit > 0 && (foodDayCounts?.[ing.foodId] || 0) >= f.weeklyLimit
+  })
+}
+
+/** 添加确认层软提示:所含食材近 7 天已吃满建议上限(达到即提示,不阻断记录) */
+export function weeklyLimitHits(ingredients, foods, foodDayCounts) {
+  const hits = []
+  for (const ing of ingredients) {
+    const f = foods[ing.foodId]
+    if (!f?.weeklyLimit) continue
+    const n = foodDayCounts?.[ing.foodId] || 0
+    if (n >= f.weeklyLimit) hits.push({ name: f.name, count: n, limit: f.weeklyLimit })
+  }
+  return hits
+}
+
 /** 搜索关键词匹配食谱:命中名称或所含食材名(搜"鸡蛋"能命中"水煮蛋") */
 export function recipeMatchesKw(recipe, kw, foods) {
   if (!kw) return true
@@ -190,17 +232,18 @@ function pickScored(candidates, usedIds, foods, metric, want, recentIds = []) {
   return finalPool.length ? finalPool[Math.floor(Math.random() * finalPool.length)].r : null
 }
 
-/** 组装一餐。返回 planItems 数组;某槽位无候选时该项为 null(由调用方提示) */
-export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, usedIds, recentIds = [] }) {
+/** 组装一餐。返回 planItems 数组;某槽位无候选时该项为 null(由调用方提示)。
+ *  foodDayCounts:近 7 天各食材出现天数(recentFoodDays),达上限的食材的食谱退出候选 */
+export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, usedIds, recentIds = [], foodDayCounts = null }) {
   const slots = MEAL_TEMPLATES[mealKey]
   const items = {}
 
   // 1) 蔬菜/水果:固定份,先算营养(蔬菜槽要求蔬菜主料 ≥100g,汤类点缀不占槽)
   for (const slot of ['vegetable', 'fruit']) {
     if (!slots.includes(slot)) continue
-    const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags }).filter(
-      (r) => slot !== 'vegetable' || vegetableCandidate(r, foods)
-    )
+    const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
+      .filter((r) => slot !== 'vegetable' || vegetableCandidate(r, foods))
+      .filter((r) => !overLimit(r, foods, foodDayCounts))
     const recipe = pickFrom(cand, usedIds, recentIds)
     if (!recipe) {
       items[slot] = null
@@ -218,8 +261,9 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   //    在低热量餐会供不应求,自动退居备选),再从中随机保证多样性
   const proteinWant = target.protein * 0.85
   const proteinMaxKcal = target.kcal * 0.45
-  const scoredCand = filterCandidates(recipes, { slot: 'protein', meal: mealKey, excludedTags }).map(
-    (r) => {
+  const scoredCand = filterCandidates(recipes, { slot: 'protein', meal: mealKey, excludedTags })
+    .filter((r) => !overLimit(r, foods, foodDayCounts))
+    .map((r) => {
       const base = scalableBase(r, foods)
       const deliverable =
         base.kcal > 0
@@ -258,6 +302,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   // 3) 主食:按剩余热量倒推;优先选"缩放范围内能足量供热量"的候选
   //    (南瓜/山药等低热量密度主食在高热量目标下天然吃亏,自动退居备选)
   const stapleCand = filterCandidates(recipes, { slot: 'staple', meal: mealKey, excludedTags })
+    .filter((r) => !overLimit(r, foods, foodDayCounts))
   const stapleRecipe = pickScored(stapleCand, usedIds, foods, 'kcal', Math.max(80, target.kcal - usedKcal(items, foods)), recentIds)
   if (stapleRecipe) {
     usedIds.add(stapleRecipe.id)
@@ -271,7 +316,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
 }
 
 /** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } } */
-export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null, recentIds = [] }) {
+export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null, recentIds = [], foodDayCounts = null }) {
   const usedIds = sharedUsedIds ?? new Set() // 传入共享集合时跨天尽量不重复用同一食谱
   const meals = {}
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
@@ -283,6 +328,7 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date, s
       excludedTags,
       usedIds,
       recentIds,
+      foodDayCounts,
     })
   }
   return { date, meals }
@@ -291,20 +337,32 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date, s
 /**
  * 生成一周计划(weekStart 起连续 7 天)。
  * 跨天共享 usedIds:同一食谱优先不在一周内重复出现,池子耗尽才回退复用。
+ * 频次约束跨天累计:每天生成后把当天用到的食材计 1 天,后续天不再超限。
  */
-export function generateWeekPlan({ recipes, foods, targets, excludedTags, weekStart, days = 7 }) {
+export function generateWeekPlan({ recipes, foods, targets, excludedTags, weekStart, days = 7, foodDayCounts = null }) {
   const usedIds = new Set()
+  const counts = { ...(foodDayCounts || {}) }
   const result = {}
   for (let i = 0; i < days; i++) {
     const date = addDays(weekStart, i)
-    result[date] = generateDayPlan({
+    const meals = generateDayPlan({
       recipes,
       foods,
       targets,
       excludedTags,
       date,
       sharedUsedIds: usedIds,
+      foodDayCounts: counts,
     }).meals
+    result[date] = meals
+    const seen = new Set()
+    for (const items of Object.values(meals)) {
+      for (const it of items || []) {
+        if (!it) continue
+        for (const ing of it.ingredients) seen.add(ing.foodId)
+      }
+    }
+    for (const id of seen) counts[id] = (counts[id] || 0) + 1
   }
   return result
 }
@@ -360,9 +418,11 @@ function categoryOrder(c) {
  * 单槽位换菜:返回换好的 planItem(排除当前食谱,给一个不同的候选)。
  * usedIds 里是全库已出现过的食谱 id,候选尽量避开(吃出新鲜感),池子耗尽才回退。
  * stapleKcal 为该餐其它条目占用后的剩余热量;缺省按经验占比 45% 估算。
+ * foodDayCounts 同 generateDayPlan:达频次上限的食材的食谱不进候选(含回退池)。
  */
-export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, target, excludedTags, usedIds, stapleKcal = null }) {
+export function swapSlotItem(mealKey, slot, currentRecipeId, { recipes, foods, target, excludedTags, usedIds, stapleKcal = null, foodDayCounts = null }) {
   let cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
+    .filter((r) => !overLimit(r, foods, foodDayCounts))
   if (slot === 'vegetable') cand = cand.filter((r) => vegetableCandidate(r, foods))
   const used = usedIds || new Set()
   let pool = cand.filter((r) => r.id !== currentRecipeId && !used.has(r.id))

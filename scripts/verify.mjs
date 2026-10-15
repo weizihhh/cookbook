@@ -588,5 +588,61 @@ check('实测速率:窗口外记录不计入(仅1条在窗内 → null)',
 check('实测速率:跨度不足14天 → null(短期波动无意义)',
   measuredWeeklyRate([{ date: '2026-10-08', kg: 75.5 }, { date: '2026-10-15', kg: 74.5 }], '2026-10-15') === null)
 
+// ---------- 25. v0.19.0 食材频次约束(weeklyLimit) ----------
+const { recentFoodDays, weeklyLimitHits } = await import('../src/core/planner.js')
+// 计数口径:滚动 7 天、按天去重(同天多餐算 1)、窗口外不计、所有来源(生成/手动)都算
+const freqDays = {
+  '2026-10-08': { lunch: [{ recipeId: 'x', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }] }] },
+  '2026-10-14': {
+    lunch: [
+      { recipeId: 'x', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }] },
+      { recipeId: 'y', slot: 'protein', ingredients: [{ foodId: 'f_egg', grams: 50, scalable: true }] },
+    ],
+    dinner: [{ recipeId: 'x', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 80, scalable: true }] }],
+  },
+}
+const fc = recentFoodDays(freqDays, '2026-10-15')
+check('频次计数:滚动7天按天去重、窗口外不计', fc['f_pork_liver'] === 1 && fc['f_egg'] === 1)
+// 生成端规避:猪肝近 7 天已吃满 1 次(上限 1)→ 不再进入任何槽位候选
+let liverPicked = false
+for (let i = 0; i < 5; i++) {
+  const pl = generateDayPlan({ recipes: RECIPES, foods: FOODS_MAP, targets, excludedTags: [], date: 't-freq', foodDayCounts: { f_pork_liver: 1 } })
+  for (const it of Object.values(pl.meals).flat()) if (it?.recipeId === 'r_stir_fried_pork_liver') liverPicked = true
+}
+check('生成端规避:猪肝达上限不再入选(随机5次)', !liverPicked)
+// 换菜端同口径规避
+const liverSwaps = []
+for (let i = 0; i < 10; i++) {
+  const s2 = swapSlotItem('lunch', 'protein', 'r_boiled_egg', {
+    recipes: RECIPES, foods: FOODS_MAP,
+    target: targets.meals.find((m) => m.key === 'lunch'),
+    excludedTags: [], usedIds: new Set(), foodDayCounts: { f_pork_liver: 1 },
+  })
+  if (s2) liverSwaps.push(s2.recipeId)
+}
+check('换菜端规避:猪肝达上限不被换入(随机10次)', liverSwaps.length === 10 && !liverSwaps.includes('r_stir_fried_pork_liver'))
+// 周计划跨天累计:合成池下猪肝(限1)整周最多出现 1 天;对照组(去掉限值)必然出现
+const synthFreq = [
+  { id: 'xf_staple', name: '合成主食', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }], steps: [] },
+  { id: 'xf_liver', name: '合成猪肝蛋白', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }], steps: [] },
+  { id: 'xf_chick', name: '合成鸡胸蛋白', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_chicken_breast', grams: 120, scalable: true }], steps: [] },
+  { id: 'xf_veg', name: '合成蔬菜', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_broccoli', grams: 200, scalable: false }], steps: [] },
+  { id: 'xf_fruit', name: '合成水果', slot: 'fruit', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_apple', grams: 200, scalable: false }], steps: [] },
+]
+const countLiverDays = (weekPlan) => Object.values(weekPlan).filter((meals) =>
+  Object.values(meals).flat().some((it) => it?.recipeId === 'xf_liver')).length
+const freqWeek = generateWeekPlan({ recipes: synthFreq, foods: FOODS_MAP, targets, excludedTags: [], weekStart: '2026-10-12' })
+const liverDaysLimited = countLiverDays(freqWeek)
+const origLiver = FOODS_MAP['f_pork_liver']
+FOODS_MAP['f_pork_liver'] = { ...origLiver, weeklyLimit: undefined } // 对照组:同一池无频次约束
+const ctrlWeek = generateWeekPlan({ recipes: synthFreq, foods: FOODS_MAP, targets, excludedTags: [], weekStart: '2026-10-12' })
+const liverDaysCtrl = countLiverDays(ctrlWeek)
+FOODS_MAP['f_pork_liver'] = origLiver
+check('周计划跨天累计:限1的猪肝整周最多出现1天(对照组无约束时会出现)', liverDaysLimited <= 1 && liverDaysCtrl >= 1, `limited=${liverDaysLimited} ctrl=${liverDaysCtrl}`)
+// 确认层软提示:达到上限命中、未达/无限值不命中
+check('软提示:达到上限命中', weeklyLimitHits([{ foodId: 'f_pork_liver', grams: 100 }], FOODS_MAP, { f_pork_liver: 1 }).length === 1)
+check('软提示:未达上限不命中', weeklyLimitHits([{ foodId: 'f_pork_liver', grams: 100 }], FOODS_MAP, { f_pork_liver: 0 }).length === 0)
+check('软提示:无限值食材不命中', weeklyLimitHits([{ foodId: 'f_egg', grams: 50 }], FOODS_MAP, { f_egg: 7 }).length === 0)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

@@ -188,7 +188,7 @@
     <AddRecipePopup v-model:show="addShow" :meal-key="addMealKey" @pick="doAdd" />
 
     <!-- 添加确认:先定克数再入餐 -->
-    <AddConfirmPopup v-model:show="addConfirmShow" :draft="addDraft" @confirm="confirmAddDraft" />
+    <AddConfirmPopup v-model:show="addConfirmShow" :draft="addDraft" :limit-hits="confirmLimitHits" @confirm="confirmAddDraft" />
 
     <!-- 打卡选择 -->
     <van-action-sheet
@@ -214,7 +214,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeIntake } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake, recentFoodDays, weeklyLimitHits } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
@@ -575,6 +575,12 @@ function doAdd(recipe) {
 
 const addConfirmShow = ref(false)
 const addDraft = ref(null)
+// 频次约束软提示:确认层所含食材近 7 天已吃满建议上限(达到即提示,不阻断)
+const confirmLimitHits = computed(() =>
+  addDraft.value
+    ? weeklyLimitHits(addDraft.value.ingredients, FOODS_MAP, recentFoodDays(week.days, today.value))
+    : []
+)
 
 function confirmAddDraft() {
   if (!addDraft.value) return
