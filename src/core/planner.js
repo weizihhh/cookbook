@@ -528,7 +528,8 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
 export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
   const skip = new Set(skipMealKeys)
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-  for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+  // 加餐无目标但热量是真实摄入,计入全天合计(热量环/记录统计口径)
+  for (const mealKey of ['breakfast', 'lunch', 'dinner', 'snack']) {
     if (skip.has(mealKey)) continue
     for (const item of dayPlan.meals[mealKey] || []) {
       if (!item) continue

@@ -9,6 +9,10 @@ import { todayStr, weekStartOf, addDays } from '../utils/date'
 
 const KEY = 'week'
 
+// 全部餐次键(含加餐);三餐有目标额度,加餐只记录不考核
+const MEAL_KEYS = ['breakfast', 'lunch', 'dinner', 'snack']
+const emptyMeals = () => ({ breakfast: [], lunch: [], dinner: [], snack: [] })
+
 /** 读取并迁移 v0.1 的单日 plan 数据到周结构(迁移后清除旧 key,避免重复迁移) */
 function initState() {
   const saved = loadState(KEY, null)
@@ -32,7 +36,7 @@ function pruneStaleEmptyDays(days, templates = []) {
   let changed = false
   for (const [date, meals] of Object.entries(days)) {
     if (date >= cutoff) continue
-    const hasContent = ['breakfast', 'lunch', 'dinner'].some((k) => (meals?.[k] || []).some(Boolean))
+    const hasContent = MEAL_KEYS.some((k) => (meals?.[k] || []).some(Boolean))
     if (!hasContent) {
       delete days[date]
       changed = true
@@ -83,6 +87,8 @@ export const useWeekStore = defineStore('week', {
       for (const mealKey of keep) {
         this.days[date][mealKey] = prev?.[mealKey] || []
       }
+      // 加餐是手动记录(生成流水线只有三餐),重新生成时原样保留
+      this.days[date].snack = prev?.snack || []
       this.persist()
     },
     /** 最近吃过的食谱 id:按天倒序、跨天去重;打卡"跳过"的餐不计(没吃过) */
@@ -97,7 +103,7 @@ export const useWeekStore = defineStore('week', {
       for (const d of dates) {
         const meals = this.days[d]
         if (!meals) continue
-        for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+        for (const mealKey of MEAL_KEYS) {
           if (checkin.statusOf(d, mealKey) === 'skip') continue
           for (const it of meals[mealKey] || []) {
             if (!it || seen.has(it.recipeId)) continue
@@ -112,6 +118,8 @@ export const useWeekStore = defineStore('week', {
      *  index 指定要换的条目下标(详情层打开的具体菜品;同餐可能有多个同槽条目);
      *  缺省或下标与槽位不符时按槽位找第一个 */
     swap(date, mealKey, slot, index = -1) {
+      // 加餐无餐次目标,不参与换菜(详情层也隐藏了按钮,此处兜底)
+      if (mealKey === 'snack') return false
       const meals = this.days[date]
       if (!meals) return false
       const profile = useProfileStore()
@@ -147,7 +155,7 @@ export const useWeekStore = defineStore('week', {
       delete this.days[date]
       this.persist()
     },
-    /** 清除某天的餐但保留指定餐(已打卡"已吃"视为锁定),返回被清的餐数 */
+    /** 清除某天的三餐但保留指定餐(已打卡"已吃"视为锁定;加餐是手动记录,一并保留),返回被清的餐数 */
     clearDayExcept(date, keepMealKeys) {
       const meals = this.days[date]
       if (!meals) return 0
@@ -171,7 +179,9 @@ export const useWeekStore = defineStore('week', {
       const recipe = RECIPES_MAP[recipeId]
       if (!recipe) return null
       this.syncWeekOf(date)
-      if (!this.days[date]) this.days[date] = { breakfast: [], lunch: [], dinner: [] }
+      if (!this.days[date]) this.days[date] = emptyMeals()
+      // 老数据的空天没有 snack 键,惰性补齐后再写入
+      if (!this.days[date][mealKey]) this.days[date][mealKey] = []
       const result = addItemToMeal(this.days[date], mealKey, recipe, ingredients)
       if (result) this.persist()
       return result
@@ -200,7 +210,7 @@ export const useWeekStore = defineStore('week', {
       let removed = 0
       for (const meals of Object.values(this.days)) {
         if (!meals) continue
-        for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
+        for (const mealKey of MEAL_KEYS) {
           const list = meals[mealKey]
           if (!list?.length) continue
           const next = list.filter((it) => !it || it.recipeId !== recipeId)
@@ -229,7 +239,8 @@ export const useWeekStore = defineStore('week', {
       const list = cloneMealItems(items)
       if (!list.length) return 0
       this.syncWeekOf(date)
-      if (!this.days[date]) this.days[date] = { breakfast: [], lunch: [], dinner: [] }
+      if (!this.days[date]) this.days[date] = emptyMeals()
+      if (!this.days[date][mealKey]) this.days[date][mealKey] = []
       if (replace) this.days[date][mealKey] = []
       this.days[date][mealKey].push(...list)
       this.persist()

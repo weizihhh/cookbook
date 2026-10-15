@@ -108,8 +108,13 @@
             <div class="meal-header">
               <span>{{ meal.label }}</span>
               <span class="meal-target">
-                实际 {{ mealActuals[meal.key].kcal }} / {{ mealTargets[meal.key].kcal }} 千卡
-                · 蛋白 {{ mealActuals[meal.key].protein }} / {{ mealTargets[meal.key].protein }}g
+                <template v-if="meal.noTarget">
+                  实际 {{ mealActuals[meal.key].kcal }} 千卡 · 蛋白 {{ mealActuals[meal.key].protein }}g · 不占三餐目标
+                </template>
+                <template v-else>
+                  实际 {{ mealActuals[meal.key].kcal }} / {{ mealTargets[meal.key].kcal }} 千卡
+                  · 蛋白 {{ mealActuals[meal.key].protein }} / {{ mealTargets[meal.key].protein }}g
+                </template>
                 <van-tag
                   v-if="checkin.statusOf(today, meal.key)"
                   :type="checkin.statusOf(today, meal.key) === 'done' ? 'success' : 'default'"
@@ -141,7 +146,7 @@
             <van-button size="small" round plain type="primary" @click="openAdd(meal.key)">
               + 添加菜品
             </van-button>
-            <van-button size="small" round plain type="primary" @click="openCheckin(meal.key)">
+            <van-button v-if="!meal.noTarget" size="small" round plain type="primary" @click="openCheckin(meal.key)">
               打卡 · {{ checkinText(meal.key) }}
             </van-button>
             <van-button size="small" round plain type="primary" @click="openTemplates(meal.key)">
@@ -183,6 +188,7 @@
     <MealDetailPopup
       v-model:show="detailShow"
       :item="detailItem"
+      :meal-key="detailMealKey"
       @swap="doSwap"
       @remove="doRemove"
       @grams-change="onGramsChange"
@@ -265,7 +271,10 @@ const kcalPercentage = computed(() =>
     ? Math.min(100, Math.round((totals.value.kcal / targets.value.kcal) * 100))
     : 0
 )
-const allSkipped = computed(() => MEALS.every((m) => mealActuals.value[m.key]?.skipped))
+// 全跳过判定只看三餐:加餐没有打卡概念,不能让它把 every 变成恒 false
+const allSkipped = computed(() =>
+  MEALS.filter((m) => !m.noTarget).every((m) => mealActuals.value[m.key]?.skipped)
+)
 // 当天是否记录过任何条目(空天/未记录时状态文案用"未记录",不算偏差)
 const hasAnyItem = computed(() =>
   MEALS.some((m) => (todayMeals.value?.[m.key] || []).some(Boolean))

@@ -64,10 +64,12 @@ export const EXCLUDE_TAGS = [
   { value: 'nuts', label: '坚果' },
 ]
 
+// noTarget:加餐无目标额度(占比 0),只记录不考核;不计入 calcTargets 的三餐分配
 export const MEALS = [
   { key: 'breakfast', label: '早餐' },
   { key: 'lunch', label: '午餐' },
   { key: 'dinner', label: '晚餐' },
+  { key: 'snack', label: '加餐', noTarget: true },
 ]
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
@@ -179,7 +181,7 @@ export function calcTargets(profile) {
   const fat = (kcal * fatRatio) / 9
   const carbs = Math.max(0, (kcal - protein * 4 - fat * 9) / 4)
 
-  const meals = MEALS.map((m, i) => ({
+  const meals = MEALS.filter((m) => !m.noTarget).map((m, i) => ({
     key: m.key,
     kcal: round(kcal * mealSplit[i]),
     protein: round(protein * mealSplit[i], 1),

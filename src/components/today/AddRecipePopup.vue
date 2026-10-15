@@ -40,7 +40,7 @@
                 <van-tag v-if="r.custom" plain type="primary" size="medium" style="margin-left: 4px">
                   {{ r.source || '自定义' }}
                 </van-tag>
-                <van-tag v-if="addSearch.trim() && !r.mealFit.includes(mealKey)" color="#c8c9cc" size="medium" style="margin-left: 4px">
+                <van-tag v-if="addSearch.trim() && mealKey !== 'snack' && !r.mealFit.includes(mealKey)" color="#c8c9cc" size="medium" style="margin-left: 4px">
                   非{{ addMealLabel }}
                 </van-tag>
               </template>
@@ -106,12 +106,13 @@ const recentRecipeIds = computed(() => week.recentRecipeIds(today.value).slice(0
 // 种子食谱 + 自定义食物(伪食谱,slot=custom 不进组装池,只在此手动添加)
 const allAddRecipes = computed(() => RECIPES.concat(customFoods.recipes))
 
+// 加餐不按 mealFit 过滤:任何食谱都可以当加餐(水果/酸奶/坚果/正餐剩菜都行)
 function filteredAddRecipes(slot) {
   const kw = addSearch.value.trim()
   return allAddRecipes.value.filter(
     (r) =>
       (slot === 'all' || r.slot === slot) &&
-      (kw ? true : r.mealFit.includes(props.mealKey)) &&
+      (kw ? true : props.mealKey === 'snack' ? true : r.mealFit.includes(props.mealKey)) &&
       (!kw || recipeMatchesKw(r, kw, FOODS_MAP))
   )
 }

@@ -43,7 +43,7 @@
         </div>
       </template>
       <div style="display: flex; gap: 10px; margin: 12px 0">
-        <van-button v-if="!item.custom" block type="primary" @click="$emit('swap')">
+        <van-button v-if="!item.custom && mealKey !== 'snack'" block type="primary" @click="$emit('swap')">
           换一个{{ SLOT_LABELS[item.slot] }}
         </van-button>
         <van-button block type="danger" plain @click="$emit('remove')">
@@ -64,6 +64,8 @@ import FoodStepper from './FoodStepper.vue'
 const props = defineProps({
   show: { type: Boolean, default: false },
   item: { type: Object, default: null },
+  // 加餐条目不支持换菜(无餐次目标可供缩放,week.swap 也兜底返回 false)
+  mealKey: { type: String, default: '' },
 })
 defineEmits(['update:show', 'swap', 'remove', 'grams-change'])
 

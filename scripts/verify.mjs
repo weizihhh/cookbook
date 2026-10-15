@@ -850,5 +850,26 @@ for (const [id, expect] of [
   check(`抗炎派生:纤维条件判定 ${id} → ${expect}`, RECIPES_MAP[id]?.antiInfl === expect)
 }
 
+// ---------- 30. v0.23.0 加餐槽 ----------
+// 目标分配不受加餐影响:calcTargets 仍只生成三餐(mealSplit 不下标越界)
+const snackTargets = calcTargets({ gender: 'male', age: 30, height: 175, weight: 70, activity: 1.375, mode: 'cut' })
+check('加餐:目标分配仍只三餐(meals 无 snack)', snackTargets.meals.length === 3 && snackTargets.meals.every((m) => m.key !== 'snack'), JSON.stringify(snackTargets.meals.map((m) => m.key)))
+// 加餐计入全天已吃合计:三餐空、仅加餐 50g 燕麦 → 热量/纤维全部来自加餐
+const snackDay = {
+  date: '2026-10-15',
+  meals: {
+    breakfast: [], lunch: [], dinner: [],
+    snack: [{ recipeId: 'x_oat_snack', slot: 'staple', ingredients: [{ foodId: 'f_oats', grams: 50, scalable: true }] }],
+  },
+}
+const snackSum = summarizeIntake(snackDay, FOODS_MAP, { kcal: 1882, protein: 126 }, [])
+check('加餐:计入全天已吃合计(三餐空仅加餐 → 191 千卡/纤维 2.7)', snackSum.totals.kcal === 191 && snackSum.totals.fiber === 2.7, JSON.stringify(snackSum.totals))
+// 老数据无 snack 键:不炸、三餐照常合计
+const legacyDay = {
+  date: '2026-10-15',
+  meals: { breakfast: [{ recipeId: 'x_rice_legacy', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }] }], lunch: [], dinner: [] },
+}
+check('加餐:老数据无 snack 键兼容', summarizeIntake(legacyDay, FOODS_MAP, { kcal: 1882, protein: 126 }, []).totals.kcal === 346)
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
