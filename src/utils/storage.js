@@ -22,7 +22,8 @@ export function saveState(key, value) {
        会持续丢失,必须让用户知道并去导出备份(30 秒节流防连环弹) */
     if ((e?.name === 'QuotaExceededError' || e?.code === 22) && Date.now() - lastQuotaToastAt > 30000) {
       lastQuotaToastAt = Date.now()
-      import('vant')
+      // 定向引 toast:按需引入后 import('vant') 会拉全量 vant 打出多余 chunk
+      import('vant/es/toast')
         .then((m) => m.showToast('本地存储已满,新记录可能保存失败,请尽快到设置页导出备份'))
         .catch(() => {})
     }
@@ -64,8 +65,3 @@ export function importFile(file) {
   })
 }
 
-export function todayStr() {
-  const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}

@@ -235,7 +235,6 @@ import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
 import { useProfileStore } from '../stores/profile'
-import { useCustomFoodsStore } from '../stores/customFoods'
 import { friendlyDate, weekStartOf, addDays, parseDate } from '../utils/date'
 import { useToday } from '../composables/useToday'
 
@@ -243,8 +242,6 @@ const week = useWeekStore()
 const checkin = useCheckinStore()
 const weight = useWeightStore()
 const profile = useProfileStore()
-const customFoods = useCustomFoodsStore()
-customFoods.sync() // 注册进 RECIPES_MAP,历史记录里的自定义食物可显示名称
 
 // 跨零点自愈:月历"今天"高亮与未来天判断随日期刷新(与今日页共用同一实例)
 const today = useToday()

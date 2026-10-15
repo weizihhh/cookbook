@@ -298,7 +298,6 @@ function openRecipe(r) {
 // ---- 自定义食物:拍照导入 / 手动录入 / 编辑 ----
 const customFoods = useCustomFoodsStore()
 const week = useWeekStore()
-customFoods.sync() // 注册进运行时 FOODS_MAP/RECIPES_MAP,供全应用按 id 查询
 
 const filterSource = ref('全部')
 const customFoodsFiltered = computed(() => {

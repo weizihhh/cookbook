@@ -95,3 +95,21 @@
   localStorage 上限再做归档(只留日期+总计)。
 - **存量数据不做口径迁移**(v0.17.0 起的一致原则):数据口径修正后,历史记录
   的营养按新口径重算(更接近真实),与记录当时显示值不同属预期。
+- **导入备份先清后写**(v0.20.2):确认覆盖后先删全部 cookbook:* key 再写入备份
+  内容,与"覆盖当前全部数据"文案语义一致;防当前多出的 key(如旧版 plan 遗留)
+  残留甚至经迁移逻辑"复活"(评审 v6 F-5)。
+
+## 构建与部署
+
+- **base 必须保持相对('./')**(v0.20.2):hash 路由 + ./ 相对引用的 SW/manifest 下,
+  可部署到任意静态平台的子路径;改回绝对路径会导致子路径部署白屏(评审 v6 F-1)。
+- **Vant 按需引入**(v0.20.2):unplugin-vue-components + VantResolver 自动注入模板
+  组件与样式。约束:函数式组件(showToast/showConfirmDialog/showLoadingToast)的
+  样式由 resolver 覆盖不到,必须在 main.js 手动引入(vant/es/toast/style、
+  vant/es/dialog/style),新增函数式组件用法时需同步补样式(评审 v6 F-2 及审阅更正)。
+- **.npmrc legacy-peer-deps**(v0.20.2):vue-router 5.1+ 对 vite 声明了可选 peer
+  ^7+,与项目 vite 6 形式冲突(其 vite 插件本项目未使用,运行时无影响);跳过
+  peer 检查以避免每次装依赖 ERESOLVE,将来升级 vite 7 后可移除。
+- **自定义食物启动时注册**(v0.20.2):customFoods.sync() 在 main.js 启动时执行
+  一次(幂等),不再依赖各视图 setup 里调用,消除"视图漏挂载则注册缺失"的
+  隐式契约(评审 v6 F-7)。

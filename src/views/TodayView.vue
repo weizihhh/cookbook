@@ -221,7 +221,6 @@ import { useProfileStore } from '../stores/profile'
 import { useWeekStore } from '../stores/week'
 import { useCheckinStore } from '../stores/checkin'
 import { useWeightStore } from '../stores/weight'
-import { useCustomFoodsStore } from '../stores/customFoods'
 import { parseDate, addDays } from '../utils/date'
 import { useToday } from '../composables/useToday'
 import { TIPS } from '../data/tips'
@@ -233,8 +232,6 @@ const profile = useProfileStore()
 const week = useWeekStore()
 const checkin = useCheckinStore()
 const weight = useWeightStore()
-const customFoods = useCustomFoodsStore()
-customFoods.sync() // 注册进 RECIPES_MAP,添加菜品/详情/加餐链路即席可用
 // 跨零点自愈:页面常驻后台过夜后 today 会刷新为新的当天,记录/打卡不再写错日期
 const today = useToday()
 const yesterday = computed(() => addDays(today.value, -1))

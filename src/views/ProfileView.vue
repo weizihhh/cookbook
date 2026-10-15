@@ -442,6 +442,12 @@ function doImport() {
     } catch {
       return
     }
+    // 先清后写,与"覆盖当前全部数据"的确认语义一致:当前多出的 key 若不清
+    // (如旧版 plan 遗留),导入后会残留甚至经迁移逻辑"复活"
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(LS_PREFIX)) localStorage.removeItem(k)
+    }
     for (const [k, v] of Object.entries(backup.data)) {
       localStorage.setItem(LS_PREFIX + k, JSON.stringify(v))
     }
