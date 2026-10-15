@@ -644,5 +644,37 @@ check('软提示:达到上限命中', weeklyLimitHits([{ foodId: 'f_pork_liver',
 check('软提示:未达上限不命中', weeklyLimitHits([{ foodId: 'f_pork_liver', grams: 100 }], FOODS_MAP, { f_pork_liver: 0 }).length === 0)
 check('软提示:无限值食材不命中', weeklyLimitHits([{ foodId: 'f_egg', grams: 50 }], FOODS_MAP, { f_egg: 7 }).length === 0)
 
+// ---------- 26. v0.20.0 PWA:manifest / service worker / 图标 ----------
+const { readFileSync, existsSync } = await import('node:fs')
+const pub = (p) => new URL(`../public/${p}`, import.meta.url)
+const manifest = JSON.parse(readFileSync(pub('manifest.webmanifest'), 'utf8'))
+check('manifest:standalone + 三规格图标(含 maskable)+ 薄荷主题色',
+  manifest.display === 'standalone' &&
+    manifest.icons.length >= 3 &&
+    manifest.theme_color === '#00b578' &&
+    manifest.icons.some((i) => i.purpose === 'maskable') &&
+    manifest.start_url === './')
+check('manifest 引用的图标文件都存在', manifest.icons.every((i) => existsSync(pub(i.src.replace('./', '')))))
+check('apple-touch-icon 存在(iOS 主屏)', existsSync(pub('icons/apple-touch-icon.png')))
+const sw = readFileSync(pub('sw.js'), 'utf8')
+check('sw.js:导航 network-first + 静态 cache-first + 旧缓存清理',
+  sw.includes("request.mode === 'navigate'") &&
+    sw.includes('caches.match(request)') &&
+    sw.includes('caches.delete') &&
+    sw.includes('skipWaiting'))
+const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+check('index.html:manifest 链接 + 主题色改薄荷绿 + apple 元信息',
+  html.includes('manifest.webmanifest') &&
+    html.includes('#00b578') &&
+    !html.includes('#1989fa') &&
+    html.includes('apple-touch-icon') &&
+    html.includes('apple-mobile-web-app-capable'))
+const isPng = (u) => {
+  const b = readFileSync(u)
+  return b.length > 100 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+}
+check('图标为有效 PNG(192/512/maskable/apple)', ['icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png']
+  .every((f) => isPng(pub(`icons/${f}`))))
+
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
