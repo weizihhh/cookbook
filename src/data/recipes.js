@@ -460,6 +460,14 @@ const RAW_RECIPES = [
     steps: ['猪肝切薄片,清水泡去血水,料酒淀粉抓匀', '大火快炒30秒至变色,加洋葱青椒出锅'],
   },
   {
+    id: 'r_braised_chicken_liver', name: '卤鸡肝', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['chicken'],
+    ingredients: [
+      { foodId: 'f_chicken_liver', grams: 120, scalable: true },
+      { foodId: 'f_olive_oil', grams: 4, scalable: false },
+    ],
+    steps: ['鸡肝泡去血水,冷水下锅加料酒姜片煮至无血丝(约8分钟)', '小火加生抽冰糖卤10分钟入味,晾凉切片'],
+  },
+  {
     id: 'r_braised_beef_brisket', name: '红烧牛腩', slot: 'protein', mealFit: ['lunch', 'dinner'], tags: ['beef'],
     ingredients: [
       { foodId: 'f_beef_brisket', grams: 120, scalable: true },

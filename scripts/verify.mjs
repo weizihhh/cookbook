@@ -694,7 +694,7 @@ check('图标为有效 PNG(192/512/maskable/apple)', ['icon-192.png', 'icon-512.
 const FOOD_REQUIRED_TAG = {
   pork: ['f_pork_loin', 'f_pork_leg', 'f_pork_liver', 'f_pork_ribs'],
   beef: ['f_beef_shank', 'f_beef_lean', 'f_beef_brisket'],
-  chicken: ['f_chicken_breast', 'f_chicken_leg', 'f_chicken_wing'],
+  chicken: ['f_chicken_breast', 'f_chicken_leg', 'f_chicken_wing', 'f_chicken_liver'],
   duck: ['f_duck_breast'],
   rabbit: ['f_rabbit'],
   lamb: ['f_lamb_lean'],
@@ -870,6 +870,14 @@ const legacyDay = {
   meals: { breakfast: [{ recipeId: 'x_rice_legacy', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }] }], lunch: [], dinner: [] },
 }
 check('加餐:老数据无 snack 键兼容', summarizeIntake(legacyDay, FOODS_MAP, { kcal: 1882, protein: 126 }, []).totals.kcal === 346)
+
+// weeklyLimit>0 的食材必须至少被 1 个食谱引用:配置无引用则生成/换菜的规避与
+// 确认层提示永远无法触达,是死配置(v0.17.1 曾以"鸡肝无引用必红"暂缓此断言,
+// v0.23.1 卤鸡肝食谱落地后转为恒绿防回归护栏)
+const limitFoodsAll = FOODS.filter((f) => (f.weeklyLimit || 0) > 0)
+const recipeFoodIds = new Set(RECIPES.flatMap((r) => r.ingredients.map((i) => i.foodId)))
+const orphanLimits = limitFoodsAll.filter((f) => !recipeFoodIds.has(f.id))
+check('weeklyLimit 配置均有食谱引用(死配置预警)', orphanLimits.length === 0, orphanLimits.map((f) => f.id).join(','))
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)
