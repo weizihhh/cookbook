@@ -11,7 +11,7 @@
 
 | 层 | 现状(立项前) | 立项后 |
 |---|---|---|
-| core 纯函数(nutrition/planner/labelScan) | `npm run verify` 160 项 | **保持不动**(数据一致性护栏) |
+| core 纯函数(nutrition/planner/labelScan) | `npm run verify` 160 项(立项时点;现 165,增量见 §10-§12) | **保持不动**(数据一致性护栏) |
 | data(foods/recipes/tips) | verify 数据一致性断言 | 保持不动 |
 | stores(week/checkin/weight/profile/customFoods) | **零自动化**(评审 v5 F-1 即此盲区实证) | Vitest 单测(P1:week;P2:其余 4 个) |
 | 视图(4 视图 + 6 弹层组件) | 仅人工 IAB 会话,不可重复 | Playwright E2E |
@@ -53,7 +53,7 @@ scripts/verify.mjs  原样保留,不动
 
 留 P2:模板 CRUD、推荐一餐、体重趋势与半动态、纤维行、排除过滤组合、频次约束提示、食谱库/自定义食物管理、营养贴士、宏量预设联动。
 
-## 4. week store 单测清单(P1,13 个迁移类 action)
+## 4. week store 单测清单(P1,13 个迁移类 action;v0.26.1 增 recentRecipeIds 共 14 个)
 
 | action | 断言要点 |
 |---|---|
@@ -67,6 +67,7 @@ scripts/verify.mjs  原样保留,不动
 | applyTemplate | 追加/覆盖双模式 |
 | deleteTemplate | 删除 |
 | removeRecipeEverywhere | 各天餐单+模板联动清;空模板删除;不动种子库 |
+| recentRecipeIds | skip 餐不计;动态加餐槽计入;按天倒序去重(v0.26.1,评审 v7 F-1) |
 | pruneStaleEmptyDays | 写回时 templates 不丢(v0.21.0 修过的隐患) |
 | persist | 序列化往返(含 templates) |
 | syncWeekOf / mealsOf | 惰性建天边界 |
@@ -148,3 +149,9 @@ scripts/verify.mjs  原样保留,不动
 - picker 选项 class 是 `.van-picker-column__item`(双下划线);picker 有默认确认栏
 - readonly van-field(模式/预设/活动量)点击 `.van-field__label` 冒泡触发比点 field 根稳
 - 设置页同名 cell(营养细节"蛋白质"vs 预览区"蛋白质")用 `.first()` 消歧,页面区块顺序:身体数据→目标→营养细节→偏好→预览
+
+## 12. 评审 v7 落地记录(2026-10-16,v0.26.1)
+
+**交付:** `npm test` 四段全绿——verify 165(§32 +2:主食槽频次过滤用餐内累计的合成池断言与无约束对照组)+ unit 58(+1:recentRecipeIds skip 语义;prune 用例原位扩展"仅加餐槽有内容的天保留")+ 功能 E2E 28(+1:场景 12b 仅加餐天计入统计与日历点同口径)+ PWA 1。
+
+**应用侧修复(docs/CODE_REVIEW_v7_2026-10-16.md F-1~F-4,共同主题是 extraMeals 结构键引入后的消费方覆盖缺口):** recentRecipeIds 过滤打卡 skip 的餐,兑现注释承诺(F-1);pruneStaleEmptyDays 的 hasContent 改走 mealLists,仅加餐槽有内容的远期天不再误清(F-2);记录页 dietStats 记录天判定与 recordDays/日历点同口径(F-3);assembleMeal 主食槽频次过滤改用餐内局部计数 localCounts,现库零行为变化、合成池断言固住(F-4)。§4 清单补 recentRecipeIds 行。

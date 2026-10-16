@@ -291,6 +291,8 @@ check('新菜品返回 added 且条目+1', r2 === 'added' && meals4.breakfast.le
 const eggOnly = computeNutrition(meals4.breakfast[0].ingredients, FOODS_MAP)
 check('200g 鸡蛋 ≈ 26.6g 蛋白(4个鸡蛋)', Math.abs(eggOnly.protein - 26.6) < 0.1, `got ${eggOnly.protein}`)
 
+// (编号 14 历史空缺:既有断言与文档按现编号互相引用,不重排补位)
+
 // ---------- 15. 生活单位 ----------
 const { formatFoodAmount } = await import('../src/data/foods.js')
 const unitFoods = FOODS.filter((f) => f.unit)
@@ -912,6 +914,26 @@ check('weeklyLimit 配置均有食谱引用(死配置预警)', orphanLimits.leng
   // 换菜"避开吃过的"含动态槽
   const emUsed = used2({ '2026-10-15': emDay })
   check('多餐次:collectUsedRecipeIds 含动态槽条目', emUsed.has('r_rice'))
+}
+
+// ---------- 32. v0.26.1 评审 v7 F-4:主食槽频次过滤同用餐内累计副本 ----------
+// assembleMeal 内蔬菜/蛋白槽一直用 localCounts(餐内累计),主食槽曾误用入参
+// foodDayCounts——同餐蛋白已入选受限食材时,含同一食材的主食仍可双中。现库
+// 受限食材(猪肝/鸡肝/金枪鱼)只在蛋白槽食谱,故用合成池锁死:同餐蛋白+主食
+// 都含限 1 食材,主食应被餐内累计挡下(宁缺不破);对照组去掉限值后主食正常
+// 入选,证明断言有牙
+{
+  const synthDualLiver = [
+    { id: 'xv_prot', name: '合成受限蛋白', slot: 'protein', mealFit: ['lunch'], tags: [], ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }], steps: [] },
+    { id: 'xv_staple', name: '合成受限主食', slot: 'staple', mealFit: ['lunch'], tags: [], ingredients: [{ foodId: 'f_pork_liver', grams: 80, scalable: true }], steps: [] },
+  ]
+  const dualItems = assembleMeal('lunch', { recipes: synthDualLiver, foods: FOODS_MAP, target: { kcal: 700, protein: 30 }, excludedTags: [], usedIds: new Set() })
+  check('主食槽频次过滤用餐内累计:同餐受限食材不双中(合成池,主食槽空)', !dualItems.some((it) => it?.slot === 'staple') && dualItems.some((it) => it?.slot === 'protein'))
+  const origLiverProbe = FOODS_MAP['f_pork_liver']
+  FOODS_MAP['f_pork_liver'] = { ...origLiverProbe, weeklyLimit: undefined }
+  const dualCtrl = assembleMeal('lunch', { recipes: synthDualLiver, foods: FOODS_MAP, target: { kcal: 700, protein: 30 }, excludedTags: [], usedIds: new Set() })
+  FOODS_MAP['f_pork_liver'] = origLiverProbe
+  check('对照组:无频次约束时同餐蛋白+主食都可入选', dualCtrl.some((it) => it?.slot === 'protein') && dualCtrl.some((it) => it?.slot === 'staple'))
 }
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)

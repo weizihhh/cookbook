@@ -339,7 +339,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   // 3) 主食:按剩余热量倒推;优先选"缩放范围内能足量供热量"的候选
   //    (南瓜/山药等低热量密度主食在高热量目标下天然吃亏,自动退居备选)
   const stapleCand = filterCandidates(recipes, { slot: 'staple', meal: mealKey, excludedTags })
-    .filter((r) => !overLimit(r, foods, foodDayCounts))
+    .filter((r) => !overLimit(r, foods, localCounts))
   const stapleRecipe = pickScored(stapleCand, usedIds, foods, 'kcal', Math.max(80, target.kcal - usedKcal(items, foods)), recentIds)
   if (stapleRecipe) {
     usedIds.add(stapleRecipe.id)

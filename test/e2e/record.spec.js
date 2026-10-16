@@ -42,3 +42,28 @@ test('场景12:月历有记录标记、统计日均与今日页同源、点选�
   await page.locator('.cal-cell', { hasText: String(yesterdayNum) }).first().click()
   await expect(detail).toContainText('该日未记录')
 })
+
+// 场景 12b:仅动态加餐槽有内容的天,统计口径与日历点一致(v0.26.1 评审 v7 F-3
+// ——dietStats 的记录天判定曾只查固定餐键,同页与 recordDays/日历点自相矛盾)
+test('场景12b:仅加餐槽有内容的天计入"饮食记录"与日均(与日历点同口径)', async ({ page }) => {
+  await injectState(page, {
+    profile: DEFAULT_PROFILE,
+    week: {
+      weekStart: '__TODAY__',
+      days: {
+        __TODAY__: {
+          breakfast: [], lunch: [], dinner: [], snack: [],
+          extraMeals: [{ id: 'em_a', label: '加餐 2', items: [RICE.item()] }],
+        },
+      },
+      templates: [],
+    },
+    checkin: { marks: {} },
+  })
+  await page.goto('/#/record')
+  await expect(page.locator('.cal-cell.today')).toHaveClass(/has-rec/)
+  await expect(page.locator('.diet-row', { hasText: '饮食记录' })).toContainText(/1 \/ \d+ 天/)
+  const kcalRow = page.locator('.diet-row', { hasText: '日均热量' })
+  await expect(kcalRow).toContainText('242')
+  await expect(kcalRow).toContainText('低 87%')
+})

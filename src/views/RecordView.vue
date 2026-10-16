@@ -273,7 +273,7 @@
 import { ref, computed } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, theoryProgress, measuredWeeklyRate } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeIntake, foodDiversity } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake, foodDiversity, mealLists } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useWeekStore } from '../stores/week'
@@ -359,7 +359,8 @@ const dietStats = computed(() => {
   for (const d of days) {
     const meals = week.days[d]
     if (!meals) continue
-    const hasItem = MEALS.some((m) => (meals[m.key] || []).some(Boolean))
+    // 判定与 recordDays/日历点同口径:仅动态加餐槽有内容的天也算记录天(评审 v7 F-3)
+    const hasItem = mealLists(meals).some((items) => (items || []).some(Boolean))
     if (!hasItem) continue
     recorded++
     const skipped = MEALS.filter((m) => checkin.statusOf(d, m.key) === 'skip').map((m) => m.key)

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodCounts, collectUsedRecipeIds } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodCounts, collectUsedRecipeIds, mealLists } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
@@ -38,7 +38,8 @@ function pruneStaleEmptyDays(days, templates = []) {
   let changed = false
   for (const [date, meals] of Object.entries(days)) {
     if (date >= cutoff) continue
-    const hasContent = MEAL_KEYS.some((k) => (meals?.[k] || []).some(Boolean))
+    // 走 mealLists:仅动态加餐槽有内容的天也算"有内容"(评审 v7 F-2)
+    const hasContent = mealLists(meals).some((items) => (items || []).some(Boolean))
     if (!hasContent) {
       delete days[date]
       changed = true
@@ -106,8 +107,13 @@ export const useWeekStore = defineStore('week', {
       for (const d of dates) {
         const meals = this.days[d]
         if (!meals) continue
-        const lists = [...MEAL_KEYS.map((k) => meals[k]), ...(meals.extraMeals || []).map((e) => e.items)]
-        for (const items of lists) {
+        // 打卡"跳过"的餐实际没吃,整餐不计;动态加餐槽无打卡概念,恒计入(评审 v7 F-1)
+        const lists = [
+          ...MEAL_KEYS.map((k) => ({ skip: checkin.statusOf(d, k) === 'skip', items: meals[k] })),
+          ...(meals.extraMeals || []).map((e) => ({ skip: false, items: e.items })),
+        ]
+        for (const { skip, items } of lists) {
+          if (skip) continue
           for (const it of items || []) {
             if (!it || seen.has(it.recipeId)) continue
             seen.add(it.recipeId)

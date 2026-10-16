@@ -51,10 +51,11 @@ describe('initState', () => {
 
 // ---- pruneStaleEmptyDays:180 天治理 ----
 describe('pruneStaleEmptyDays', () => {
-  it('清远期空天,保留远期有内容天与近期空天,写回带 templates', () => {
+  it('清远期空天,保留有内容天(含仅加餐槽)与近期空天,写回带 templates', () => {
     const t = todayStr()
     const far = addDays(t, -200)
     const farKept = addDays(t, -190)
+    const farEm = addDays(t, -195) // 远期"仅加餐槽有内容" → 留(v7 F-2:hasContent 认动态槽)
     const near = addDays(t, -10)
     const tpl = { id: 't_x', mealKey: 'lunch', name: 'X', items: [mkItem(A)], createdAt: far }
     saveState('week', {
@@ -62,6 +63,7 @@ describe('pruneStaleEmptyDays', () => {
       days: {
         [far]: { breakfast: [], lunch: [], dinner: [], snack: [] }, // 远期空天 → 清
         [farKept]: { breakfast: [mkItem(A)] }, // 远期有内容 → 留
+        [farEm]: { breakfast: [], lunch: [], dinner: [], snack: [], extraMeals: [{ id: 'em_old', label: '加餐 2', items: [mkItem(A)] }] },
         [near]: { breakfast: [] }, // 近期空天 → 留
       },
       templates: [tpl],
@@ -69,6 +71,7 @@ describe('pruneStaleEmptyDays', () => {
     const week = useWeekStore()
     expect(week.days[far]).toBeUndefined()
     expect(week.days[farKept].breakfast).toHaveLength(1)
+    expect(week.days[farEm].extraMeals[0].items).toHaveLength(1)
     expect(week.days[near]).toBeDefined()
     // 写回必须带 templates(v0.21.0 修过的丢模板隐患)
     const saved = JSON.parse(localStorage.getItem('cookbook:week'))
@@ -336,6 +339,24 @@ describe('extraMeals 动态加餐槽', () => {
     const emId = week.addExtraMeal(t)
     week.addItem(t, emId, B)
     expect(week.recentRecipeIds()).toContain(B)
+  })
+})
+
+// ---- recentRecipeIds:"最近吃过"语义(v0.26.1 评审 v7 F-1) ----
+describe('recentRecipeIds skip 语义', () => {
+  it('打卡 skip 的餐不计,未跳过餐与动态加餐槽计入', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const checkin = useCheckinStore()
+    week.pushMealItems(t, 'lunch', [mkItem(A)])
+    week.pushMealItems(t, 'dinner', [mkItem(B)])
+    const emId = week.addExtraMeal(t)
+    week.addItem(t, emId, C)
+    checkin.mark(t, 'dinner', 'skip')
+    const ids = week.recentRecipeIds()
+    expect(ids).toContain(A) // 未跳过的餐计入
+    expect(ids).toContain(C) // 动态槽无打卡概念,恒计入
+    expect(ids).not.toContain(B) // skip 的餐没吃过,不计
   })
 })
 
