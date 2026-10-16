@@ -209,3 +209,31 @@ F-1~F-4 均不涉及 DECISIONS 已议决项,可作为"评审 v7 落地"版本收
 ---
 
 *评审人:WorkBuddy;方法:全量源码通读(src 29 文件)+ verify 实测 + 构建产物实测 + 测试配置与代表性测试审读。*
+
+---
+
+## 6. 落地复核(v0.26.1,2026-10-16 同日)
+
+基线 `38dee9c`;F-1~F-4 当天全部落地,逐条核验:
+
+| 项 | 核验结论 |
+|---|---|
+| F-1 | ✔ `recentRecipeIds` 按 `checkin.statusOf(d,k)==='skip'` 过滤、动态槽恒计入、死变量消除;新增单测"skip 餐不计/动态槽计入/倒序去重",TEST_PLAN §4 清单补行——语义不再只靠注释自保 |
+| F-2 | ✔ `hasContent` 改走 `mealLists`;prune 单测原位扩展"远期仅加餐槽天 → 保留"用例 |
+| F-3 | ✔ `dietStats` 的 hasItem 与 recordDays/日历点同走 `mealLists`;E2E 场景 12b 为**精确档**(仅加餐天 242 千卡 / 低 87% 写死断言) |
+| F-4 | ✔ `foodDayCounts`→`localCounts` 一字之改;verify §32 合成池断言 + 去掉限值的对照组,证明断言有牙。§14 跳号以注释说明不重排(编号已被交叉引用),合理 |
+
+**本轮实测:** `node scripts/verify.mjs` 165 项全绿;`npx vitest run` 65 项全绿
+(默认 forks 池在本会话环境 worker 启动失败报 "failed to find the runner",
+`--pool=vmThreads` 下全绿——【推断,需确认】大概率为本会话沙箱环境所致,
+请在日常终端跑一次 `npm run test:unit` 复核;若普通终端也复现,需在
+vitest.config.js 固化 `pool: 'vmThreads'`)。E2E 本轮未重跑(场景 12b 断言
+本身经审读:注入结构合法、242=70g 大米×346kcal 手算吻合)。
+
+**新发现(极低,文档漂移):** TEST_PLAN §12 写"unit 58",实测 65——
+v0.26.0 的 7 项多餐次单测(extraMeals describe 块)当时未入账,顺手把 §12
+的 58 改为 65 即可。
+
+**结论:** 评审 v7 四条闭环,修复方式与建议一致、断言固化到位;逻辑正确性
+评分回升至 **9.3**。当前无已知未落地的代码缺陷;已知残余回到 DECISIONS
+登记的路线项(薯类食部、src 条目号溯源、钠、真 App 判据)。

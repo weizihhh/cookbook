@@ -152,6 +152,6 @@ scripts/verify.mjs  原样保留,不动
 
 ## 12. 评审 v7 落地记录(2026-10-16,v0.26.1)
 
-**交付:** `npm test` 四段全绿——verify 165(§32 +2:主食槽频次过滤用餐内累计的合成池断言与无约束对照组)+ unit 58(+1:recentRecipeIds skip 语义;prune 用例原位扩展"仅加餐槽有内容的天保留")+ 功能 E2E 28(+1:场景 12b 仅加餐天计入统计与日历点同口径)+ PWA 1。
+**交付:** `npm test` 四段全绿——verify 165(§32 +2:主食槽频次过滤用餐内累计的合成池断言与无约束对照组)+ unit 65(含 v0.26.0 未入账的 7 项 extraMeals 单测;本次 +1:recentRecipeIds skip 语义,prune 用例原位扩展"仅加餐槽有内容的天保留")+ 功能 E2E 28(+1:场景 12b 仅加餐天计入统计与日历点同口径)+ PWA 1。
 
 **应用侧修复(docs/CODE_REVIEW_v7_2026-10-16.md F-1~F-4,共同主题是 extraMeals 结构键引入后的消费方覆盖缺口):** recentRecipeIds 过滤打卡 skip 的餐,兑现注释承诺(F-1);pruneStaleEmptyDays 的 hasContent 改走 mealLists,仅加餐槽有内容的远期天不再误清(F-2);记录页 dietStats 记录天判定与 recordDays/日历点同口径(F-3);assembleMeal 主食槽频次过滤改用餐内局部计数 localCounts,现库零行为变化、合成池断言固住(F-4)。§4 清单补 recentRecipeIds 行。
