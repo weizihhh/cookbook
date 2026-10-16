@@ -24,7 +24,7 @@
         </template>
       </van-cell>
       <div v-for="h in limitHits" :key="h.name" class="limit-hint">
-        {{ h.name }}:近 7 天已出现 {{ h.count }} 天,已达建议上限(≤{{ h.limit }} 次/周),不建议再加
+        {{ h.name }}:近 7 天已吃 {{ h.count }} 次,已达建议上限(≤{{ h.limit }} 次/周),不建议再加
       </div>
       <div class="nutri-grid" style="margin: 10px 0">
         <div><div class="num">{{ nutrition.kcal }}</div><div class="label">千卡</div></div>

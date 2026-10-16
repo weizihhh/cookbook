@@ -85,9 +85,9 @@ test('场景21:频次约束提示——近 7 天吃过猪肝后,确认层红字�
   await mealCard(page, '午餐').getByRole('button', { name: '+ 添加菜品' }).click()
   await page.locator('.add-list .van-cell', { hasText: '爆炒猪肝' }).click()
   await expect(page.locator('.detail-title', { hasText: '添加:爆炒猪肝' })).toBeVisible()
-  // 软提示:达到上限显示但不阻断
+  // 软提示:达到上限显示但不阻断(次数口径:昨日 1 条=已吃 1 次)
   await expect(page.locator('.limit-hint')).toContainText(
-    '猪肝:近 7 天已出现 1 天,已达建议上限(≤1 次/周),不建议再加'
+    '猪肝:近 7 天已吃 1 次,已达建议上限(≤1 次/周),不建议再加'
   )
   await page.getByRole('button', { name: '添加', exact: true }).click()
   await expect(mealCard(page, '午餐').locator('.van-cell', { hasText: '爆炒猪肝' })).toBeVisible()

@@ -242,3 +242,50 @@ test('场景11c:复制昨日——覆盖分支清打卡标记', async ({ page })
   await expect(mealCard(page, '晚餐').locator('.van-cell', { hasText: '白米饭' })).toHaveCount(1)
   await expect(mealHeader(page, '晚餐').locator('.van-tag', { hasText: '已吃' })).toHaveCount(0)
 })
+
+test('场景25:动态加餐槽——再加一餐/计入合计/详情无换菜/重生成保留/删槽', async ({ page }) => {
+  await page.goto('/#/today')
+  // 再加一餐:出现"加餐 2"卡并自动打开添加弹层(全库可选,snack 语义)
+  await page.getByRole('button', { name: '+ 再加一餐' }).click()
+  const emCard = mealCard(page, '加餐 2')
+  await expect(page.locator('.van-search input')).toBeVisible()
+  await page.locator('.van-search input').fill('白米饭')
+  await page.locator('.add-list .van-cell', { hasText: '白米饭' }).click()
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  // 槽内条目与头部口径(不占三餐目标),顶部合计含动态槽
+  await expect(emCard.locator('.van-cell', { hasText: '白米饭' })).toBeVisible()
+  await expect(mealHeader(page, '加餐 2')).toContainText('实际 242 千卡 · 蛋白 5g · 不占三餐目标')
+  await expect(page.locator('.kcal-num')).toHaveText('242')
+
+  // 详情层无"换菜"按钮(无餐次目标),可移除/改克数
+  // (先等添加确认弹层关闭动画结束,否则两个 detail-title 同屏触发 strict 冲突)
+  await expect(page.locator('.detail-title', { hasText: '添加:' })).toBeHidden()
+  await emCard.locator('.van-cell', { hasText: '白米饭' }).click()
+  await expect(page.locator('.detail-title', { hasText: '白米饭' }).first()).toBeVisible()
+  await expect(page.locator('.van-button', { hasText: '换一个' })).toHaveCount(0)
+  await page.keyboard.press('Escape') // 关闭详情弹层(遮罩挡住了页面按钮)
+
+  // 重新生成三餐(无已吃锁定直接重生成):动态槽是手动记录,原样保留
+  // (加餐卡把按钮区推出视口、又被 fixed tabbar 遮挡,locator click 过不了
+  //  actionability——evaluate 派发原生 click,项目记忆既有解法)
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('重新生成'))
+    btn.click()
+  })
+  await expect(page.locator('.van-toast', { hasText: '已生成' })).toBeVisible()
+  await expect(emCard.locator('.van-cell', { hasText: '白米饭' })).toHaveCount(1)
+  await expect(mealCard(page, '晚餐').locator('.slot-chip').first()).toBeVisible()
+
+  // 删除槽:确认弹窗 → 卡消失,合计恰好减去该槽 242 千卡(三餐保留)。图标同样在遮挡区,evaluate 派发
+  const kcalBeforeDel = await readKcal(page)
+  await page.evaluate(() => {
+    const h = [...document.querySelectorAll('.van-cell-group__title--inset')].find((x) =>
+      x.textContent.includes('加餐 2')
+    )
+    h.querySelector('.em-del').click()
+  })
+  await page.getByRole('button', { name: '确认' }).click()
+  await expect(page.locator('.van-toast', { hasText: '已删除' })).toBeVisible()
+  await expect(mealCard(page, '加餐 2')).toHaveCount(0)
+  expect(await readKcal(page)).toBe(kcalBeforeDel - 242)
+})

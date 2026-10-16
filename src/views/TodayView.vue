@@ -165,6 +165,40 @@
           </div>
         </van-cell-group>
 
+        <!-- 动态加餐槽(v0.26.0 多餐次):与固定"加餐"同语义,无目标只记录、计入合计 -->
+        <van-cell-group v-for="em in extraMeals" :key="em.id" inset style="margin-bottom: 12px">
+          <template #title>
+            <div class="meal-header">
+              <span>{{ em.label }}</span>
+              <span class="meal-target">
+                实际 {{ mealActuals[em.id].kcal }} 千卡 · 蛋白 {{ mealActuals[em.id].protein }}g · 不占三餐目标
+                <van-icon name="delete-o" class="em-del" @click="confirmRemoveExtra(em)" />
+              </span>
+            </div>
+          </template>
+          <template v-for="(item, i) in em.items" :key="i">
+            <van-cell v-if="item" is-link @click="openDetail(em.id, i)">
+              <template #title>
+                <span class="slot-chip">{{ SLOT_LABELS[item.slot] }}</span>
+                {{ recipeName(item.recipeId) }}
+              </template>
+              <template #label>
+                {{ ingredientText(item) }} · {{ itemNutrition(item).kcal }} 千卡
+              </template>
+            </van-cell>
+          </template>
+          <van-cell v-if="!em.items.filter(Boolean).length" title="未记录" label="点下方 + 添加菜品,记录实际吃的" />
+          <div class="meal-actions">
+            <van-button size="small" round plain type="primary" @click="openAdd(em.id, 'snack')">
+              + 添加菜品
+            </van-button>
+          </div>
+        </van-cell-group>
+
+        <div class="add-extra-row" v-if="profile.isConfigured">
+          <van-button size="small" round plain type="primary" @click="addExtraMealAction">+ 再加一餐</van-button>
+        </div>
+
         <div style="display: flex; gap: 10px">
           <template v-if="todayMeals">
             <van-button block round type="primary" plain @click="generate">重新生成</van-button>
@@ -188,14 +222,14 @@
     <MealDetailPopup
       v-model:show="detailShow"
       :item="detailItem"
-      :meal-key="detailMealKey"
+      :meal-key="detailMealKey?.startsWith('em_') ? 'snack' : detailMealKey"
       @swap="doSwap"
       @remove="doRemove"
       @grams-change="onGramsChange"
     />
 
     <!-- 添加菜品弹层 -->
-    <AddRecipePopup v-model:show="addShow" :meal-key="addMealKey" @pick="doAdd" />
+    <AddRecipePopup v-model:show="addShow" :meal-key="addFilterKey" @pick="doAdd" />
 
     <!-- 添加确认:先定克数再入餐 -->
     <AddConfirmPopup v-model:show="addConfirmShow" :draft="addDraft" :limit-hits="confirmLimitHits" @confirm="confirmAddDraft" />
@@ -230,7 +264,7 @@
 import { ref, computed, watch } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { MEALS, GOAL_MODES } from '../core/nutrition'
-import { SLOT_LABELS, computeNutrition, summarizeIntake, recentFoodDays, weeklyLimitHits } from '../core/planner'
+import { SLOT_LABELS, computeNutrition, summarizeIntake, recentFoodCounts, weeklyLimitHits } from '../core/planner'
 import { FOODS_MAP, formatFoodAmount, snapGramsToUnit } from '../data/foods'
 import { RECIPES_MAP } from '../data/recipes'
 import { useProfileStore } from '../stores/profile'
@@ -277,7 +311,8 @@ const allSkipped = computed(() =>
 )
 // 当天是否记录过任何条目(空天/未记录时状态文案用"未记录",不算偏差)
 const hasAnyItem = computed(() =>
-  MEALS.some((m) => (todayMeals.value?.[m.key] || []).some(Boolean))
+  MEALS.some((m) => (todayMeals.value?.[m.key] || []).some(Boolean)) ||
+  extraMeals.value.some((e) => e.items.some(Boolean))
 )
 const deviationClass = computed(() => {
   if (!hasAnyItem.value) return 'none'
@@ -301,8 +336,7 @@ const mealTargets = computed(() =>
 // 每餐实际合计(随添加/移除/改克数实时变化);skipped 标记该餐是否被打卡跳过
 const mealActuals = computed(() => {
   const out = {}
-  for (const m of MEALS) {
-    const items = todayMeals.value?.[m.key] || []
+  const calc = (items, skipped) => {
     const total = { kcal: 0, protein: 0 }
     for (const it of items) {
       if (!it) continue
@@ -310,11 +344,13 @@ const mealActuals = computed(() => {
       total.kcal += n.kcal
       total.protein += n.protein
     }
-    out[m.key] = {
-      kcal: Math.round(total.kcal),
-      protein: Math.round(total.protein),
-      skipped: checkin.statusOf(today.value, m.key) === 'skip',
-    }
+    return { kcal: Math.round(total.kcal), protein: Math.round(total.protein), skipped }
+  }
+  for (const m of MEALS) {
+    out[m.key] = calc(todayMeals.value?.[m.key] || [], checkin.statusOf(today.value, m.key) === 'skip')
+  }
+  for (const em of extraMeals.value) {
+    out[em.id] = calc(em.items, false) // 加餐槽无打卡概念
   }
   return out
 })
@@ -459,8 +495,13 @@ async function clearToday() {
   }
 }
 function mealItems(mealKey) {
-  return todayMeals.value?.[mealKey] || []
+  const m = todayMeals.value
+  if (!m) return []
+  if (mealKey.startsWith('em_')) return m.extraMeals?.find((e) => e.id === mealKey)?.items || []
+  return m[mealKey] || []
 }
+// 动态加餐槽:再额外记的几餐(无目标只记录)
+const extraMeals = computed(() => todayMeals.value?.extraMeals || [])
 
 // ---- 一键套用:复制昨日 / 常吃模板 / 预算推荐三条路共用同一交互 ----
 // 今天该餐为空直接套用;已有菜品时问追加还是覆盖(覆盖=该餐记录重来,清打卡防悬挂)
@@ -591,7 +632,7 @@ const detailMealKey = ref(null)
 const detailIndex = ref(-1)
 const detailItem = computed(() =>
   detailShow.value && todayMeals.value && detailMealKey.value != null
-    ? todayMeals.value[detailMealKey.value][detailIndex.value]
+    ? mealItems(detailMealKey.value)[detailIndex.value] ?? null
     : null
 )
 
@@ -620,12 +661,30 @@ function doRemove() {
   showToast('已移除')
 }
 
+// ---- 动态加餐槽 ----
+function addExtraMealAction() {
+  const id = week.addExtraMeal(today.value)
+  showToast('已加一餐')
+  openAdd(id, 'snack') // 顺滑衔接:加完直接打开添加弹层
+}
+async function confirmRemoveExtra(em) {
+  try {
+    await showConfirmDialog({ title: `删除「${em.label}」`, message: '该餐的记录将一并删除,确定?' })
+  } catch {
+    return
+  }
+  week.removeExtraMeal(today.value, em.id)
+  showToast('已删除')
+}
+
 // ---- 添加菜品:弹层与确认层为子组件,这里只构造 draft 与入餐 ----
 const addShow = ref(false)
-const addMealKey = ref('')
+const addMealKey = ref('') // 实际写入目标(可能是动态加餐槽 em_ 键)
+const addFilterKey = ref('') // 添加弹层的过滤键:动态槽传 'snack' 复用"全库可选"语义
 
-function openAdd(mealKey) {
+function openAdd(mealKey, filterKey = mealKey) {
   addMealKey.value = mealKey
+  addFilterKey.value = filterKey
   addShow.value = true
 }
 
@@ -650,7 +709,7 @@ const addDraft = ref(null)
 // 频次约束软提示:确认层所含食材近 7 天已吃满建议上限(达到即提示,不阻断)
 const confirmLimitHits = computed(() =>
   addDraft.value
-    ? weeklyLimitHits(addDraft.value.ingredients, FOODS_MAP, recentFoodDays(week.days, today.value))
+    ? weeklyLimitHits(addDraft.value.ingredients, FOODS_MAP, recentFoodCounts(week.days, today.value))
     : []
 )
 
@@ -661,7 +720,7 @@ function confirmAddDraft() {
   if (result === 'added') {
     showToast(`已添加:${recipe.name}`)
   } else if (result === 'merged') {
-    const main = week.mealsOf(today.value)?.[addMealKey.value]?.find((it) => it.recipeId === recipe.id)
+    const main = mealItems(addMealKey.value).find((it) => it.recipeId === recipe.id)
     const mainIng = main?.ingredients.find((i) => i.scalable) || main?.ingredients[0]
     showToast(`已累加:${recipe.name}(共 ${formatFoodAmount(FOODS_MAP[mainIng?.foodId], mainIng?.grams || 0)})`)
   }
@@ -862,6 +921,18 @@ function ingredientText(item) {
 }
 .meal-actions .van-button {
   flex: 1;
+}
+.add-extra-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.em-del {
+  font-size: 15px;
+  color: #c8c9cc;
+  margin-left: 6px;
+  padding: 2px;
+  cursor: pointer;
 }
 .weight-body {
   display: flex;

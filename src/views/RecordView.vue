@@ -246,6 +246,19 @@
             </div>
             <div v-if="!itemsOf(selectedData, meal.key).length" class="item-line muted">未记录</div>
           </div>
+          <!-- 动态加餐槽:与固定"加餐"同语义,无打卡标记 -->
+          <div v-for="em in selectedData.meals.extraMeals || []" :key="em.id" class="meal-block">
+            <div class="meal-line">
+              <van-tag plain size="medium">{{ em.label }}</van-tag>
+            </div>
+            <div v-for="(item, i) in em.items.filter(Boolean)" :key="i" class="item-line">
+              <span v-if="item.slot" class="slot-chip">{{ SLOT_LABELS[item.slot] }}</span>
+              <span class="item-name">{{ recipeName(item.recipeId) }}</span>
+              <span class="item-kcal">{{ itemNutrition(item).kcal }} 千卡</span>
+              <div class="item-sub">{{ ingredientText(item) }}</div>
+            </div>
+            <div v-if="!em.items.filter(Boolean).length" class="item-line muted">未记录</div>
+          </div>
         </template>
         <div v-else class="item-line muted" style="padding: 8px 0 4px">该日未记录</div>
       </div>
@@ -451,8 +464,9 @@ const recordDays = computed(() => {
     if (!meals) continue
     const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
     let has = false
-    for (const m of MEALS) {
-      for (const it of meals[m.key] || []) {
+    const lists = [...MEALS.map((m) => meals[m.key] || []), ...(meals.extraMeals || []).map((e) => e.items)]
+    for (const items of lists) {
+      for (const it of items) {
         if (!it) continue
         has = true
         const n = computeNutrition(it.ingredients, FOODS_MAP)
@@ -580,6 +594,7 @@ function onPickDay(d) {
 }
 
 function itemsOf(day, mealKey) {
+  if (mealKey?.startsWith('em_')) return day.meals?.extraMeals?.find((e) => e.id === mealKey)?.items || []
   return (day.meals[mealKey] || []).filter(Boolean)
 }
 function recipeName(id) {

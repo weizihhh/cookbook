@@ -596,8 +596,9 @@ check('实测速率:跨度不足14天 → null(短期波动无意义)',
   measuredWeeklyRate([{ date: '2026-10-08', kg: 75.5 }, { date: '2026-10-15', kg: 74.5 }], '2026-10-15') === null)
 
 // ---------- 25. v0.19.0 食材频次约束(weeklyLimit) ----------
-const { recentFoodDays, weeklyLimitHits } = await import('../src/core/planner.js')
-// 计数口径:滚动 7 天、按天去重(同天多餐算 1)、窗口外不计、所有来源(生成/手动)都算
+const { recentFoodCounts, weeklyLimitHits } = await import('../src/core/planner.js')
+// 计数口径(v0.26.0 按次):滚动 7 天、每个食谱条目计 1 次(同天两条=2 次)、
+// 窗口外不计、所有来源(生成/手动)都算;此前按天去重口径已废弃(DECISIONS 登记)
 const freqDays = {
   '2026-10-08': { lunch: [{ recipeId: 'x', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }] }] },
   '2026-10-14': {
@@ -608,8 +609,8 @@ const freqDays = {
     dinner: [{ recipeId: 'x', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 80, scalable: true }] }],
   },
 }
-const fc = recentFoodDays(freqDays, '2026-10-15')
-check('频次计数:滚动7天按天去重、窗口外不计', fc['f_pork_liver'] === 1 && fc['f_egg'] === 1)
+const fc = recentFoodCounts(freqDays, '2026-10-15')
+check('频次计数:按次累计(10-14两条=2次)、窗口外不计(10-08在窗外)', fc['f_pork_liver'] === 2 && fc['f_egg'] === 1)
 // 生成端规避:猪肝近 7 天已吃满 1 次(上限 1)→ 不再进入任何槽位候选
 let liverPicked = false
 for (let i = 0; i < 5; i++) {
@@ -628,7 +629,7 @@ for (let i = 0; i < 10; i++) {
   if (s2) liverSwaps.push(s2.recipeId)
 }
 check('换菜端规避:猪肝达上限不被换入(随机10次)', liverSwaps.length === 10 && !liverSwaps.includes('r_stir_fried_pork_liver'))
-// 周计划跨天累计:合成池下猪肝(限1)整周最多出现 1 天;对照组(去掉限值)必然出现
+// 周计划跨天累计:合成池下猪肝(限1)整周最多出现 1 条;对照组(去掉限值)必然出现
 const synthFreq = [
   { id: 'xf_staple', name: '合成主食', slot: 'staple', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_rice', grams: 100, scalable: true }], steps: [] },
   { id: 'xf_liver', name: '合成猪肝蛋白', slot: 'protein', mealFit: ['breakfast', 'lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }], steps: [] },
@@ -636,16 +637,27 @@ const synthFreq = [
   { id: 'xf_veg', name: '合成蔬菜', slot: 'vegetable', mealFit: ['lunch', 'dinner'], tags: [], ingredients: [{ foodId: 'f_broccoli', grams: 200, scalable: false }], steps: [] },
   { id: 'xf_fruit', name: '合成水果', slot: 'fruit', mealFit: ['breakfast'], tags: [], ingredients: [{ foodId: 'f_apple', grams: 200, scalable: false }], steps: [] },
 ]
-const countLiverDays = (weekPlan) => Object.values(weekPlan).filter((meals) =>
-  Object.values(meals).flat().some((it) => it?.recipeId === 'xf_liver')).length
+const countLiverItems = (weekPlan) => Object.values(weekPlan).flatMap((meals) => Object.values(meals).flat()).filter((it) => it?.recipeId === 'xf_liver').length
 const freqWeek = generateWeekPlan({ recipes: synthFreq, foods: FOODS_MAP, targets, excludedTags: [], weekStart: '2026-10-12' })
-const liverDaysLimited = countLiverDays(freqWeek)
+const liverDaysLimited = countLiverItems(freqWeek)
 const origLiver = FOODS_MAP['f_pork_liver']
 FOODS_MAP['f_pork_liver'] = { ...origLiver, weeklyLimit: undefined } // 对照组:同一池无频次约束
 const ctrlWeek = generateWeekPlan({ recipes: synthFreq, foods: FOODS_MAP, targets, excludedTags: [], weekStart: '2026-10-12' })
-const liverDaysCtrl = countLiverDays(ctrlWeek)
+const liverDaysCtrl = countLiverItems(ctrlWeek)
 FOODS_MAP['f_pork_liver'] = origLiver
-check('周计划跨天累计:限1的猪肝整周最多出现1天(对照组无约束时会出现)', liverDaysLimited <= 1 && liverDaysCtrl >= 1, `limited=${liverDaysLimited} ctrl=${liverDaysCtrl}`)
+check('周计划跨天累计:限1的猪肝整周最多出现1条(对照组无约束时会出现)', liverDaysLimited <= 1 && liverDaysCtrl >= 1, `limited=${liverDaysLimited} ctrl=${liverDaysCtrl}`)
+// 天内累计(v0.26.0):蛋白池仅剩猪肝时,单日只入 1 条、后续餐蛋白槽空(宁缺不破);
+// 对照组(临时去掉限值)三餐全猪肝,证明机制有牙
+const liverOnly = synthFreq.filter((r) => r.id !== 'xf_chick')
+const intraPlan = generateDayPlan({ recipes: liverOnly, foods: FOODS_MAP, targets, excludedTags: [], date: 't-intraday' })
+const intraN = Object.values(intraPlan.meals).flat().filter((it) => it?.recipeId === 'xf_liver').length
+check('天内累计:单日受限食材最多1条', intraN === 1, `n=${intraN}`)
+const origLimitProbe = FOODS_MAP['f_pork_liver']
+FOODS_MAP['f_pork_liver'] = { ...origLimitProbe, weeklyLimit: undefined }
+const intraCtrl = generateDayPlan({ recipes: liverOnly, foods: FOODS_MAP, targets, excludedTags: [], date: 't-intraday' })
+const intraCtrlN = Object.values(intraCtrl.meals).flat().filter((it) => it?.recipeId === 'xf_liver').length
+FOODS_MAP['f_pork_liver'] = origLimitProbe
+check('天内累计对照组:无约束时三餐都可入猪肝', intraCtrlN === 3, `n=${intraCtrlN}`)
 // 确认层软提示:达到上限命中、未达/无限值不命中
 check('软提示:达到上限命中', weeklyLimitHits([{ foodId: 'f_pork_liver', grams: 100 }], FOODS_MAP, { f_pork_liver: 1 }).length === 1)
 check('软提示:未达上限不命中', weeklyLimitHits([{ foodId: 'f_pork_liver', grams: 100 }], FOODS_MAP, { f_pork_liver: 0 }).length === 0)
@@ -878,6 +890,29 @@ const limitFoodsAll = FOODS.filter((f) => (f.weeklyLimit || 0) > 0)
 const recipeFoodIds = new Set(RECIPES.flatMap((r) => r.ingredients.map((i) => i.foodId)))
 const orphanLimits = limitFoodsAll.filter((f) => !recipeFoodIds.has(f.id))
 check('weeklyLimit 配置均有食谱引用(死配置预警)', orphanLimits.length === 0, orphanLimits.map((f) => f.id).join(','))
+
+// ---------- 31. v0.26.0 多餐次:动态加餐槽(extraMeals)的纯函数覆盖 ----------
+{
+  const { summarizeIntake: sum2, recentFoodCounts: rfc2, collectUsedRecipeIds: used2 } = await import('../src/core/planner.js')
+  const emDay = {
+    breakfast: [{ recipeId: 'r_rice', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 70, scalable: true }] }],
+    lunch: [], dinner: [], snack: [],
+    extraMeals: [
+      { id: 'em_a', label: '加餐 2', items: [{ recipeId: 'r_rice', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 70, scalable: true }] }] },
+      { id: 'em_b', label: '加餐 3', items: [] },
+    ],
+  }
+  // 早餐 242 + 加餐槽 242 = 484:动态槽计入全天合计
+  check('多餐次:动态加餐槽计入全天合计', sum2({ date: 't', meals: emDay }, FOODS_MAP, { kcal: 1882, protein: 140 }, []).totals.kcal === 484)
+  // skip 不作用于动态槽(无打卡概念):skip 四固定餐后仍计 242
+  check('多餐次:skip 只作用于固定餐,动态槽恒计入', sum2({ date: 't', meals: emDay }, FOODS_MAP, { kcal: 1882, protein: 140 }, ['breakfast', 'lunch', 'dinner', 'snack']).totals.kcal === 242)
+  // 频次计数含动态槽且不因结构键误遍历而炸:两条米饭条目 = 2 次
+  const emCounts = rfc2({ '2026-10-15': emDay }, '2026-10-15')
+  check('多餐次:频次按次计数含动态槽(2 条米饭=2 次)', emCounts['f_rice'] === 2)
+  // 换菜"避开吃过的"含动态槽
+  const emUsed = used2({ '2026-10-15': emDay })
+  check('多餐次:collectUsedRecipeIds 含动态槽条目', emUsed.has('r_rice'))
+}
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)
 process.exit(failed === 0 ? 0 : 1)

@@ -119,30 +119,31 @@ export function filterCandidates(recipes, { slot, meal, excludedTags = [] }) {
 }
 
 /**
- * 近 windowDays 个日历日内各食材"出现过的天数"(同一天多餐只计 1 天,
- * 生成/手动添加都算——健康暴露只看事实)。健康频次约束(weeklyLimit)的计数口径。
+ * 近 windowDays 个日历日内各食材"出现次数"(每个食谱条目计 1 次:同餐累加合并仍是
+ * 1 条=1 次,同一天两个独立条目=2 次;生成/手动添加都算——健康暴露只看事实)。
+ * 健康频次约束(weeklyLimit)的计数口径。
+ * v0.26.0 前按"出现过的天数"计数(同天多餐只计 1),一天吃两次受限食材不触发
+ * 上限——已改按次口径(DECISIONS.md 登记)
  */
-export function recentFoodDays(days, today, windowDays = 7) {
+export function recentFoodCounts(days, today, windowDays = 7) {
   const from = addDays(today, -(windowDays - 1))
   const counts = {}
-  for (const [date, meals] of Object.entries(days)) {
+  for (const [date, dayMeals] of Object.entries(days)) {
     if (date < from || date > today) continue
-    const seen = new Set()
-    for (const items of Object.values(meals || {})) {
+    for (const items of mealLists(dayMeals)) {
       for (const it of items || []) {
         if (!it) continue
-        for (const ing of it.ingredients) seen.add(ing.foodId)
+        for (const ing of it.ingredients) counts[ing.foodId] = (counts[ing.foodId] || 0) + 1
       }
     }
-    for (const id of seen) counts[id] = (counts[id] || 0) + 1
   }
   return counts
 }
 
 /** 近 windowDays 天食材多样性:滚动窗内出现过的食材种数与其中蔬菜类种数
- *  (与 recentFoodDays 同窗口、同"出现即计"口径)。膳食指南参考:平均每天 ≥12 种、每周 ≥25 种 */
+ *  (与 recentFoodCounts 同窗口,只看种数不看次数)。膳食指南参考:平均每天 ≥12 种、每周 ≥25 种 */
 export function foodDiversity(days, today, foods, windowDays = 7) {
-  const counts = recentFoodDays(days, today, windowDays)
+  const counts = recentFoodCounts(days, today, windowDays)
   let vegetables = 0
   for (const id of Object.keys(counts)) {
     if (foods[id]?.category === 'vegetable') vegetables++
@@ -279,23 +280,35 @@ function pickScored(candidates, usedIds, foods, metric, want, recentIds = [], ma
 }
 
 /** 组装一餐。返回 planItems 数组;某槽位无候选时该项为 null(由调用方提示)。
- *  foodDayCounts:近 7 天各食材出现天数(recentFoodDays),达上限的食材的食谱退出候选 */
+ *  foodDayCounts(次数口径,历史命名):近 7 天各食材出现次数(recentFoodCounts),
+ *  达上限的食材的食谱退出候选。
+ *  天内累计(v0.26.0):本函数持局部计数副本,受限食材每入选一条即 +1——
+ *  同一餐装配内与同日三餐间(generateDayPlan 复用本函数)都不再超限,
+ *  清掉"同天两餐可同时入选同一受限食材"的旧缺口(评审 v4 F-3.1 登记) */
 export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, usedIds, recentIds = [], foodDayCounts = null }) {
   const slots = MEAL_TEMPLATES[mealKey]
   const items = {}
+  const localCounts = { ...(foodDayCounts || {}) }
+  // 受限食材入选即回写局部计数(只关心有 weeklyLimit 的,多样性统计不走这里)
+  const bumpLimit = (recipe) => {
+    for (const ing of recipe.ingredients) {
+      if (foods[ing.foodId]?.weeklyLimit > 0) localCounts[ing.foodId] = (localCounts[ing.foodId] || 0) + 1
+    }
+  }
 
   // 1) 蔬菜/水果:固定份,先算营养(蔬菜槽要求蔬菜主料 ≥100g,汤类点缀不占槽)
   for (const slot of ['vegetable', 'fruit']) {
     if (!slots.includes(slot)) continue
     const cand = filterCandidates(recipes, { slot, meal: mealKey, excludedTags })
       .filter((r) => slot !== 'vegetable' || vegetableCandidate(r, foods))
-      .filter((r) => !overLimit(r, foods, foodDayCounts))
+      .filter((r) => !overLimit(r, foods, localCounts))
     const recipe = pickFrom(cand, usedIds, recentIds)
     if (!recipe) {
       items[slot] = null
       continue
     }
     usedIds.add(recipe.id)
+    bumpLimit(recipe)
     items[slot] = {
       recipeId: recipe.id,
       slot,
@@ -310,10 +323,11 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   const proteinWant = target.protein * 0.85
   const proteinMaxKcal = target.kcal * 0.45
   const proteinCand = filterCandidates(recipes, { slot: 'protein', meal: mealKey, excludedTags })
-    .filter((r) => !overLimit(r, foods, foodDayCounts))
+    .filter((r) => !overLimit(r, foods, localCounts))
   const proteinRecipe = pickScored(proteinCand, usedIds, foods, 'protein', proteinWant, recentIds, proteinMaxKcal)
   if (proteinRecipe) {
     usedIds.add(proteinRecipe.id)
+    bumpLimit(proteinRecipe)
     items.protein = scaleRecipe(proteinRecipe, foods, {
       byProtein: proteinWant,
       maxKcal: proteinMaxKcal,
@@ -329,6 +343,7 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
   const stapleRecipe = pickScored(stapleCand, usedIds, foods, 'kcal', Math.max(80, target.kcal - usedKcal(items, foods)), recentIds)
   if (stapleRecipe) {
     usedIds.add(stapleRecipe.id)
+    bumpLimit(stapleRecipe)
     const remaining = Math.max(80, target.kcal - usedKcal(items, foods))
     items.staple = scaleRecipe(stapleRecipe, foods, { byKcal: remaining })
   } else {
@@ -339,10 +354,12 @@ export function assembleMeal(mealKey, { recipes, foods, target, excludedTags, us
 }
 
 /** 生成单日计划 { date, meals: { breakfast: [...], lunch: [...], dinner: [...] } }
- *  foodDayCounts 三餐共用且天内不累计:同一天两个含同一受限食材的不同食谱可同时
- *  入选;跨天累计由 generateWeekPlan 负责(受限食材入多食谱前需先补天内累计) */
+ *  foodDayCounts(次数口径,历史命名):近 7 天各食材出现次数。天内累计分两层:
+ *  餐内由 assembleMeal 的局部计数承担,三餐间由本函数每餐装配后回写共享计数——
+ *  同一天两餐不再同时入选同一受限食材;跨天累计由 generateWeekPlan 负责 */
 export function generateDayPlan({ recipes, foods, targets, excludedTags, date, sharedUsedIds = null, recentIds = [], foodDayCounts = null }) {
   const usedIds = sharedUsedIds ?? new Set() // 传入共享集合时跨天尽量不重复用同一食谱
+  const counts = { ...(foodDayCounts || {}) }
   const meals = {}
   for (const mealKey of ['breakfast', 'lunch', 'dinner']) {
     const target = targets.meals.find((m) => m.key === mealKey)
@@ -353,8 +370,15 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date, s
       excludedTags,
       usedIds,
       recentIds,
-      foodDayCounts,
+      foodDayCounts: counts,
     })
+    // 该餐入选的受限食材回写,后续餐次规避(与 generateWeekPlan 跨天累计同构)
+    for (const it of meals[mealKey]) {
+      if (!it) continue
+      for (const ing of it.ingredients) {
+        if (foods[ing.foodId]?.weeklyLimit > 0) counts[ing.foodId] = (counts[ing.foodId] || 0) + 1
+      }
+    }
   }
   return { date, meals }
 }
@@ -362,7 +386,8 @@ export function generateDayPlan({ recipes, foods, targets, excludedTags, date, s
 /**
  * 生成一周计划(weekStart 起连续 7 天)。
  * 跨天共享 usedIds:同一食谱优先不在一周内重复出现,池子耗尽才回退复用。
- * 频次约束跨天累计:每天生成后把当天用到的食材计 1 天,后续天不再超限。
+ * 频次约束跨天累计:每天生成后按条目把当天用到的食材各计 1 次(次数口径,
+ * 与 recentFoodCounts 一致),后续天不再超限;天内的约束由 generateDayPlan 负责。
  */
 export function generateWeekPlan({ recipes, foods, targets, excludedTags, weekStart, days = 7, foodDayCounts = null }) {
   const usedIds = new Set()
@@ -380,14 +405,12 @@ export function generateWeekPlan({ recipes, foods, targets, excludedTags, weekSt
       foodDayCounts: counts,
     }).meals
     result[date] = meals
-    const seen = new Set()
     for (const items of Object.values(meals)) {
       for (const it of items || []) {
         if (!it) continue
-        for (const ing of it.ingredients) seen.add(ing.foodId)
+        for (const ing of it.ingredients) counts[ing.foodId] = (counts[ing.foodId] || 0) + 1
       }
     }
-    for (const id of seen) counts[id] = (counts[id] || 0) + 1
   }
   return result
 }
@@ -439,13 +462,27 @@ function categoryOrder(c) {
   return i === -1 ? 99 : i
 }
 
-/** 从 days(周计划结构 {日期: {breakfast/lunch/dinner: 条目[]}})提取全库已出现过的
- *  食谱 id。换菜的"避开吃过的"用它;曾因 store 层 .flat() 展不开 meals 对象而
+/** 某天的全部条目列表:四固定餐 + 动态加餐槽(v0.26.0 多餐次)。
+ *  extraMeals 是天对象上的结构键(数组),Object.values 遍历会把它误当条目列表,
+ *  所有"遍历一天全部菜品"的消费方统一走这里,防漏算与结构误遍历 */
+export function mealLists(dayMeals) {
+  if (!dayMeals) return []
+  const lists = []
+  for (const [key, items] of Object.entries(dayMeals)) {
+    if (key === 'extraMeals') continue
+    lists.push(items)
+  }
+  for (const m of dayMeals.extraMeals || []) lists.push(m.items)
+  return lists
+}
+
+/** 从 days(周计划结构 {日期: {breakfast/lunch/dinner/snack: 条目[], extraMeals: 加餐槽[]}})提取
+ *  全库已出现过的食谱 id。换菜的"避开吃过的"用它;曾因 store 层 .flat() 展不开 meals 对象而
  *  恒为空集(评审 v5 F-1),下沉为纯函数供 verify 直测,堵住组装层不可测的盲区 */
 export function collectUsedRecipeIds(days) {
   const ids = new Set()
   for (const meals of Object.values(days || {})) {
-    for (const items of Object.values(meals || {})) {
+    for (const items of mealLists(meals)) {
       for (const it of items || []) {
         if (it) ids.add(it.recipeId)
       }
@@ -528,10 +565,8 @@ export function addItemToMeal(meals, mealKey, recipe, ingredients = null) {
 export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
   const skip = new Set(skipMealKeys)
   const totals = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-  // 加餐无目标但热量是真实摄入,计入全天合计(热量环/记录统计口径)
-  for (const mealKey of ['breakfast', 'lunch', 'dinner', 'snack']) {
-    if (skip.has(mealKey)) continue
-    for (const item of dayPlan.meals[mealKey] || []) {
+  const addItems = (items) => {
+    for (const item of items || []) {
       if (!item) continue
       const n = computeNutrition(item.ingredients, foods)
       totals.kcal += n.kcal
@@ -541,6 +576,12 @@ export function summarizeIntake(dayPlan, foods, targets, skipMealKeys = []) {
       totals.fiber += n.fiber
     }
   }
+  // 加餐(固定槽与动态加餐槽)无目标但热量是真实摄入,计入全天合计(热量环/记录统计口径)
+  for (const mealKey of ['breakfast', 'lunch', 'dinner', 'snack']) {
+    if (skip.has(mealKey)) continue
+    addItems(dayPlan.meals[mealKey])
+  }
+  for (const em of dayPlan.meals?.extraMeals || []) addItems(em.items)
   totals.kcal = Math.round(totals.kcal)
   totals.protein = r1(totals.protein)
   totals.carbs = r1(totals.carbs)

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { RECIPES, RECIPES_MAP } from '../data/recipes'
 import { FOODS_MAP } from '../data/foods'
-import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodDays, collectUsedRecipeIds } from '../core/planner'
+import { generateDayPlan, swapSlotItem, addItemToMeal, cloneMealItems, computeNutrition, recentFoodCounts, collectUsedRecipeIds } from '../core/planner'
 import { useProfileStore } from './profile'
 import { useCheckinStore } from './checkin'
 import { loadState, saveState, removeState } from '../utils/storage'
@@ -9,9 +9,11 @@ import { todayStr, weekStartOf, addDays } from '../utils/date'
 
 const KEY = 'week'
 
-// 全部餐次键(含加餐);三餐有目标额度,加餐只记录不考核
+// 全部餐次键(含加餐);三餐有目标额度,加餐只记录不考核。
+// extraMeals 是结构键(动态加餐槽数组,{id,label,items}),不属餐次键——
+// 遍历天数据时统一走 planner 的 mealLists,勿直接 Object.values
 const MEAL_KEYS = ['breakfast', 'lunch', 'dinner', 'snack']
-const emptyMeals = () => ({ breakfast: [], lunch: [], dinner: [], snack: [] })
+const emptyMeals = () => ({ breakfast: [], lunch: [], dinner: [], snack: [], extraMeals: [] })
 
 /** 读取并迁移 v0.1 的单日 plan 数据到周结构(迁移后清除旧 key,避免重复迁移) */
 function initState() {
@@ -81,14 +83,15 @@ export const useWeekStore = defineStore('week', {
         excludedTags: profile.excludedTags,
         date,
         // 近 7 天食材频次(猪肝维A/金枪鱼汞等 weeklyLimit),生成端规避超限
-        foodDayCounts: recentFoodDays(this.days, date),
+        foodDayCounts: recentFoodCounts(this.days, date),
       }).meals
       const keep = new Set(keepMealKeys)
       for (const mealKey of keep) {
         this.days[date][mealKey] = prev?.[mealKey] || []
       }
-      // 加餐是手动记录(生成流水线只有三餐),重新生成时原样保留
+      // 加餐(固定槽与动态加餐槽)是手动记录(生成流水线只有三餐),重新生成时原样保留
       this.days[date].snack = prev?.snack || []
+      this.days[date].extraMeals = prev?.extraMeals || []
       this.persist()
     },
     /** 最近吃过的食谱 id:按天倒序、跨天去重;打卡"跳过"的餐不计(没吃过) */
@@ -103,9 +106,9 @@ export const useWeekStore = defineStore('week', {
       for (const d of dates) {
         const meals = this.days[d]
         if (!meals) continue
-        for (const mealKey of MEAL_KEYS) {
-          if (checkin.statusOf(d, mealKey) === 'skip') continue
-          for (const it of meals[mealKey] || []) {
+        const lists = [...MEAL_KEYS.map((k) => meals[k]), ...(meals.extraMeals || []).map((e) => e.items)]
+        for (const items of lists) {
+          for (const it of items || []) {
             if (!it || seen.has(it.recipeId)) continue
             seen.add(it.recipeId)
             out.push(it.recipeId)
@@ -118,8 +121,8 @@ export const useWeekStore = defineStore('week', {
      *  index 指定要换的条目下标(详情层打开的具体菜品;同餐可能有多个同槽条目);
      *  缺省或下标与槽位不符时按槽位找第一个 */
     swap(date, mealKey, slot, index = -1) {
-      // 加餐无餐次目标,不参与换菜(详情层也隐藏了按钮,此处兜底)
-      if (mealKey === 'snack') return false
+      // 加餐(固定槽与动态槽)无餐次目标,不参与换菜(详情层也隐藏了按钮,此处兜底)
+      if (mealKey === 'snack' || mealKey.startsWith('em_')) return false
       const meals = this.days[date]
       if (!meals) return false
       const profile = useProfileStore()
@@ -144,7 +147,7 @@ export const useWeekStore = defineStore('week', {
         excludedTags: profile.excludedTags,
         usedIds,
         stapleKcal: Math.max(80, target.kcal - othersKcal),
-        foodDayCounts: recentFoodDays(this.days, date),
+        foodDayCounts: recentFoodCounts(this.days, date),
       })
       if (!next) return false
       meals[mealKey][idx] = next
@@ -170,33 +173,81 @@ export const useWeekStore = defineStore('week', {
       return cleared
     },
     // ---- 自定义编辑:添加/移除菜品、改克数(记录实际进食) ----
+    /** 某天某餐的条目列表(动态加餐槽 em_ 键路由到槽对象的 items) */
+    itemListOf(date, mealKey) {
+      const meals = this.days[date]
+      if (!meals) return null
+      if (mealKey.startsWith('em_')) return meals.extraMeals?.find((e) => e.id === mealKey)?.items || null
+      return meals[mealKey] || null
+    },
+    /** 动态加餐槽:再加一餐(无目标只记录,语义对齐固定"加餐"槽),返回新槽 id */
+    addExtraMeal(date) {
+      this.syncWeekOf(date)
+      if (!this.days[date]) this.days[date] = emptyMeals()
+      const meals = this.days[date]
+      if (!Array.isArray(meals.extraMeals)) meals.extraMeals = []
+      // 固定"加餐"视为 1 号,动态槽从"加餐 2"起编号
+      const em = {
+        id: 'em_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        label: `加餐 ${meals.extraMeals.length + 2}`,
+        items: [],
+      }
+      meals.extraMeals.push(em)
+      this.persist()
+      return em.id
+    },
+    /** 删除动态加餐槽(连同其中记录);剩余槽重新编号保持连续 */
+    removeExtraMeal(date, emId) {
+      const meals = this.days[date]
+      const i = meals?.extraMeals?.findIndex((e) => e.id === emId) ?? -1
+      if (i < 0) return false
+      meals.extraMeals.splice(i, 1)
+      meals.extraMeals.forEach((e, idx) => (e.label = `加餐 ${idx + 2}`))
+      this.persist()
+      return true
+    },
     /** 添加菜品(基准份;同餐已有同食谱则克数累加) */
     addItem(date, mealKey, recipeId) {
       return this.addItemCustom(date, mealKey, recipeId, null)
     },
-    /** 添加菜品并指定各食材克数;当天无数据时创建空天(免生成直接记录) */
+    /** 添加菜品并指定各食材克数;当天无数据时创建空天(免生成直接记录)。
+     *  mealKey 以 em_ 开头时路由到对应动态加餐槽(其条目列表在槽对象的 items 键,
+     *  addItemToMeal 的"同食谱克数累加"对槽对象同样成立) */
     addItemCustom(date, mealKey, recipeId, ingredients) {
       const recipe = RECIPES_MAP[recipeId]
       if (!recipe) return null
       this.syncWeekOf(date)
       if (!this.days[date]) this.days[date] = emptyMeals()
-      // 老数据的空天没有 snack 键,惰性补齐后再写入
-      if (!this.days[date][mealKey]) this.days[date][mealKey] = []
-      const result = addItemToMeal(this.days[date], mealKey, recipe, ingredients)
+      const meals = this.days[date]
+      if (!Array.isArray(meals.extraMeals)) meals.extraMeals = []
+      let holder
+      let listKey
+      if (mealKey.startsWith('em_')) {
+        const em = meals.extraMeals.find((m) => m.id === mealKey)
+        if (!em) return null
+        holder = em
+        listKey = 'items'
+      } else {
+        // 老数据的空天没有 snack 键,惰性补齐后再写入
+        if (!meals[mealKey]) meals[mealKey] = []
+        holder = meals
+        listKey = mealKey
+      }
+      const result = addItemToMeal(holder, listKey, recipe, ingredients)
       if (result) this.persist()
       return result
     },
-    /** 移除某餐第 index 个菜品 */
+    /** 移除某餐第 index 个菜品(支持动态加餐槽 em_ 键) */
     removeItem(date, mealKey, index) {
-      const meals = this.days[date]
-      if (!meals || !meals[mealKey] || index < 0 || index >= meals[mealKey].length) return false
-      meals[mealKey].splice(index, 1)
+      const list = this.itemListOf(date, mealKey)
+      if (!list || index < 0 || index >= list.length) return false
+      list.splice(index, 1)
       this.persist()
       return true
     },
-    /** 移除菜品中某食材克数(实时重算营养) */
+    /** 移除菜品中某食材克数(实时重算营养;支持动态加餐槽 em_ 键) */
     updateGrams(date, mealKey, index, foodId, grams) {
-      const item = this.days[date]?.[mealKey]?.[index]
+      const item = this.itemListOf(date, mealKey)?.[index]
       if (!item) return false
       const ing = item.ingredients.find((i) => i.foodId === foodId)
       if (!ing || !(grams >= 5 && grams <= 1000)) return false
@@ -210,12 +261,16 @@ export const useWeekStore = defineStore('week', {
       let removed = 0
       for (const meals of Object.values(this.days)) {
         if (!meals) continue
-        for (const mealKey of MEAL_KEYS) {
-          const list = meals[mealKey]
+        const lists = [...MEAL_KEYS, ...(meals.extraMeals || []).map((e) => e.id)]
+        for (const key of lists) {
+          const list = key.startsWith('em_') ? meals.extraMeals.find((e) => e.id === key)?.items : meals[key]
           if (!list?.length) continue
           const next = list.filter((it) => !it || it.recipeId !== recipeId)
           removed += list.length - next.length
-          if (next.length !== list.length) meals[mealKey] = next
+          if (next.length !== list.length) {
+            if (key.startsWith('em_')) meals.extraMeals.find((e) => e.id === key).items = next
+            else meals[key] = next
+          }
         }
       }
       for (const tpl of this.templates) {

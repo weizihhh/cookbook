@@ -226,12 +226,13 @@ describe('copyMeal & pushMealItems', () => {
 
 // ---- addItem:免生成直接记录(记录型用户核心路径) ----
 describe('addItem & addItemCustom', () => {
-  it('空库状态下直接添加:惰性建天+四餐键齐全', () => {
+  it('空库状态下直接添加:惰性建天+四餐键与动态槽结构键齐全', () => {
     const t = todayStr()
     const week = useWeekStore()
     const result = week.addItem(t, 'lunch', A)
     expect(result).toBeTruthy()
-    expect(Object.keys(week.days[t]).sort()).toEqual(['breakfast', 'dinner', 'lunch', 'snack'])
+    expect(Object.keys(week.days[t]).sort()).toEqual(['breakfast', 'dinner', 'extraMeals', 'lunch', 'snack'])
+    expect(Array.isArray(week.days[t].extraMeals)).toBe(true)
     expect(week.days[t].lunch).toHaveLength(1)
   })
 
@@ -250,6 +251,91 @@ describe('addItem & addItemCustom', () => {
     const week = useWeekStore()
     expect(week.addItem(t, 'lunch', 'r_not_exist')).toBeNull()
     expect(week.days[t]).toBeUndefined()
+  })
+})
+
+// ---- 动态加餐槽(v0.26.0 多餐次) ----
+describe('extraMeals 动态加餐槽', () => {
+  it('addExtraMeal 编号从"加餐 2"起,删除后剩余槽重新编号', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const id2 = week.addExtraMeal(t)
+    const id3 = week.addExtraMeal(t)
+    expect(week.days[t].extraMeals.map((e) => e.label)).toEqual(['加餐 2', '加餐 3'])
+    expect(week.removeExtraMeal(t, id2)).toBe(true)
+    expect(week.days[t].extraMeals.map((e) => e.label)).toEqual(['加餐 2']) // 删除后重编号
+    expect(week.days[t].extraMeals[0].id).toBe(id3)
+    expect(week.removeExtraMeal(t, id2)).toBe(false) // 已删的槽
+  })
+
+  it('em_ 键路由:添加累加/移除/改克数/取列表都作用于槽内条目', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    expect(week.addItem(t, emId, A)).toBeTruthy()
+    expect(week.addItem(t, emId, A)).toBeTruthy() // 累加:1 条克数翻倍
+    const em = week.days[t].extraMeals[0]
+    expect(em.items).toHaveLength(1)
+    const g1 = RECIPES_MAP[A].ingredients[0].grams
+    expect(em.items[0].ingredients[0].grams).toBe(g1 * 2)
+    expect(week.itemListOf(t, emId)).toBe(em.items)
+    expect(week.updateGrams(t, emId, 0, em.items[0].ingredients[0].foodId, 150)).toBe(true)
+    expect(em.items[0].ingredients[0].grams).toBe(150)
+    expect(week.removeItem(t, emId, 0)).toBe(true)
+    expect(em.items).toHaveLength(0)
+    // 不存在的槽
+    expect(week.addItem(t, 'em_none', A)).toBeNull()
+    expect(week.itemListOf(t, 'em_none')).toBeNull()
+  })
+
+  it('swap 拒绝动态加餐槽', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    week.addItem(t, emId, A)
+    expect(week.swap(t, emId, 'staple')).toBe(false)
+  })
+
+  it('generateDay 保留动态加餐槽,clearDayExcept 一并保留(手动记录语义)', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    week.addItem(t, emId, A)
+    week.addItem(t, 'lunch', B)
+    week.generateDay(t)
+    expect(week.days[t].extraMeals).toHaveLength(1)
+    expect(week.days[t].extraMeals[0].items).toHaveLength(1)
+    week.clearDayExcept(t, [])
+    expect(week.days[t].extraMeals).toHaveLength(1) // 清空三餐不动动态槽
+  })
+
+  it('老数据天无 extraMeals 键时,操作惰性补键', () => {
+    const t = todayStr()
+    saveState('week', { weekStart: weekStartOf(t), days: { [t]: { breakfast: [], lunch: [], dinner: [], snack: [] } } })
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    expect(week.days[t].extraMeals).toHaveLength(1)
+    week.addItem(t, emId, A)
+    expect(week.days[t].extraMeals[0].items).toHaveLength(1)
+  })
+
+  it('removeRecipeEverywhere 联动清动态槽条目', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    week.addItem(t, emId, A)
+    week.addItem(t, 'lunch', A)
+    expect(week.removeRecipeEverywhere(A)).toBe(2)
+    expect(week.days[t].extraMeals[0].items).toHaveLength(0)
+    expect(week.days[t].lunch).toHaveLength(0)
+  })
+
+  it('recentRecipeIds 含动态加餐槽里吃过的', () => {
+    const t = todayStr()
+    const week = useWeekStore()
+    const emId = week.addExtraMeal(t)
+    week.addItem(t, emId, B)
+    expect(week.recentRecipeIds()).toContain(B)
   })
 })
 
