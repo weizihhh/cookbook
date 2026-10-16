@@ -49,7 +49,7 @@ function pick(lines, pred) {
 
 /**
  * 解析成分表文本。能量+三大营养素至少抓到 3 项才认为有效,否则返回 null(走纯手填)。
- * @returns null | { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat }(数值均为包装口径原值)
+ * @returns null | { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat, fiber, sodium }(数值均为包装口径原值)
  */
 export function parseNutritionLabel(text) {
   if (!text) return null
@@ -82,19 +82,22 @@ export function parseNutritionLabel(text) {
     pick(lines, (l) => /饱和脂肪/.test(l))
   // 膳食纤维:国标成分表常见行,可不出现;不参与"至少 3 项"有效性判定
   const fiber = pick(lines, (l) => l.includes('膳食纤维'))
+  // 钠:国标成分表标配行(毫克),可不出现;同不参与有效性判定。
+  // 只进自定义食物层展示,不做全天汇总(烹饪盐不在成分表内,DECISIONS 登记)
+  const sodium = pick(lines, (l) => l.includes('钠'))
 
   const hits = [energyKj != null || energyKcal != null, protein != null, carbs != null, fat != null].filter(
     Boolean
   ).length
   if (hits < 3) return null
 
-  return { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat, fiber }
+  return { basis, perServeGrams, energyKj, energyKcal, protein, carbs, fat, fiber, sodium }
 }
 
 /**
  * 任意口径归一到每 100g。
  * @param serveGramsOverride "每份"口径下补填的每份克数(优先于解析值)
- * @returns null(每份但缺克数)| { kcal, protein, carbs, fat }
+ * @returns null(每份但缺克数)| { kcal, protein, carbs, fat, fiber, sodium }
  */
 export function normalizeTo100g(parsed, serveGramsOverride = null) {
   const pg = serveGramsOverride ?? parsed.perServeGrams
@@ -112,5 +115,6 @@ export function normalizeTo100g(parsed, serveGramsOverride = null) {
     carbs: r1(parsed.carbs),
     fat: r1(parsed.fat),
     fiber: r1(parsed.fiber),
+    sodium: r1(parsed.sodium),
   }
 }

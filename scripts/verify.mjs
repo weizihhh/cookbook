@@ -568,12 +568,12 @@ check('采购清单输出购买量(300g 带壳蛤蜊)', shellList[0]?.grams === 
 // 红薯 = 第6版红心甘薯(官方别名即"红薯":432kJ/103kcal、C24.7、食部90%),
 // 曾用 90/21.3 无出处;评审 v3 引用的"红心 61kcal/C15.3"经官方平台核实不成立
 check('红薯对齐第6版红心甘薯(103kcal/C24.7)', FOODS_MAP['f_sweet_potato'].kcal === 103 && FOODS_MAP['f_sweet_potato'].carbs === 24.7)
-check('红薯 200g ≈ 206kcal', computeNutrition([{ foodId: 'f_sweet_potato', grams: 200 }], FOODS_MAP).kcal === 206)
+check('红薯 200g ≈ 185kcal(v0.27.0 起按食部 90% 折算,旧口径未折为 206)', computeNutrition([{ foodId: 'f_sweet_potato', grams: 200 }], FOODS_MAP).kcal === 185)
 // 生/干/熟口径角标:克数编辑处必须可见(生米与熟饭差 3 倍)
 check('口径角标:大米(生)', formatFoodAmount(FOODS_MAP['f_rice'], 80) === '80g·生重')
 check('口径角标:挂面(干)', formatFoodAmount(FOODS_MAP['f_noodles_dry'], 100) === '100g·干重')
 check('口径角标:鹰嘴豆(熟)', formatFoodAmount(FOODS_MAP['f_chickpea_cooked'], 100) === '100g·熟重')
-check('口径角标:无标记食材不受影响', formatFoodAmount(FOODS_MAP['f_yam'], 200) === '200g')
+check('口径角标:无标记食材不受影响(v0.27.0 山药带食部后样例换黄瓜)', formatFoodAmount(FOODS_MAP['f_cucumber'], 200) === '200g')
 
 // ---------- 24. v0.18.0 目标体重进度预测 ----------
 const { theoryProgress, measuredWeeklyRate } = await import('../src/core/nutrition.js')
@@ -934,6 +934,56 @@ check('weeklyLimit 配置均有食谱引用(死配置预警)', orphanLimits.leng
   const dualCtrl = assembleMeal('lunch', { recipes: synthDualLiver, foods: FOODS_MAP, target: { kcal: 700, protein: 30 }, excludedTags: [], usedIds: new Set() })
   FOODS_MAP['f_pork_liver'] = origLiverProbe
   check('对照组:无频次约束时同餐蛋白+主食都可入选', dualCtrl.some((it) => it?.slot === 'protein') && dualCtrl.some((it) => it?.slot === 'staple'))
+}
+
+// ---------- 33. v0.27.0 薯芋南瓜食部 / 钠建模 / src 溯源 ----------
+// 食部:5 条官方第 6 版逐条核实(马铃薯 94/甘薯红心 90/山药 83/芋头 84/南瓜 85,
+// 平台 foodinfo/313·316·525·526 与编码 04-3-213);紫薯无官方条目不标
+{
+  const edibleExpect = { f_potato: 0.94, f_sweet_potato: 0.9, f_yam: 0.83, f_taro: 0.84, f_pumpkin: 0.85 }
+  const badEdible = Object.entries(edibleExpect).filter(([id, v]) => FOODS_MAP[id]?.edible !== v)
+  check('薯芋南瓜食部按官方第6版标注(5条)', badEdible.length === 0, badEdible.map(([id]) => id).join(','))
+  check('紫薯无官方条目不标食部(100%口径,诚实原则优先)', !('edible' in (FOODS_MAP['f_purple_potato'] || {})))
+}
+// 钠:全覆盖(纯油脂=0);官方/成分表锚点逐位固定(防近似值体系数量级手误)
+{
+  const noSodium = FOODS.filter((f) => !(f.sodium >= 0))
+  check(`钠:食材全覆盖(${FOODS.length} 条)`, noSodium.length === 0, noSodium.map((f) => f.id).join(','))
+  const oilLeak = FOODS.filter((f) => f.category === 'oil_nuts' && f.name.endsWith('油') && f.sodium !== 0)
+  check('钠:纯油脂为零(生理零钠)', oilLeak.length === 0, oilLeak.map((f) => f.id).join(','))
+  const sodiumAnchors = [
+    ['f_sweet_potato', 28.5], ['f_potato', 2.7], ['f_pumpkin', 0.8],
+    ['f_laver', 710.5], ['f_dried_small_shrimp', 5057.7], ['f_noodles_dry', 184.5],
+  ]
+  const badNa = sodiumAnchors.filter(([id, v]) => FOODS_MAP[id].sodium !== v)
+  check('钠:官方/成分表锚点逐位吻合(红薯/土豆/南瓜/紫菜/虾皮/挂面)', badNa.length === 0, badNa.map(([id]) => id).join(','))
+}
+// src 溯源:锚点先行(其余默认近似,foods.js 头注释声明);v0.27.0 核实的 5 条全挂码
+{
+  const srcFoods = FOODS.filter((f) => f.src)
+  const srcFloor = 15
+  check(`src:溯源锚点 ≥${srcFloor} 条且出处非空`, srcFoods.length >= srcFloor && srcFoods.every((f) => typeof f.src === 'string' && f.src.length >= 4), `got ${srcFoods.length}`)
+  check('src:v0.27.0 官方核实的薯芋南瓜 5 条全部挂码', ['f_potato', 'f_sweet_potato', 'f_yam', 'f_taro', 'f_pumpkin'].every((id) => FOODS_MAP[id].src))
+}
+// labelScan 钠行:毫克解析、每份同系数换算,不参与"至少 3 项"有效性判定
+{
+  const { parseNutritionLabel: plNa, normalizeTo100g: normNa } = await import('../src/core/labelScan.js')
+  const labelNa = `营养成分表
+每100g
+能量 1600千焦
+蛋白质 8.0克
+脂肪 15.2克
+碳水化合物 62.0克
+钠 400毫克`
+  const pNa = plNa(labelNa)
+  check('labelScan:钠行解析(毫克口径)', pNa?.sodium === 400 && normNa(pNa)?.sodium === 400, JSON.stringify(pNa?.sodium))
+  const pNaServe = plNa(`每份30g
+能量 500kJ
+蛋白质 3.0g
+脂肪 4.5g
+碳水化合物 22.5g
+钠 150毫克`)
+  check('labelScan:每份口径钠同系数换算(150 × 100/30 = 500)', normNa(pNaServe)?.sodium === 500, JSON.stringify(normNa(pNaServe)?.sodium))
 }
 
 console.log(failed === 0 ? '\n全部通过 ✓' : `\n${failed} 项失败 ✗`)

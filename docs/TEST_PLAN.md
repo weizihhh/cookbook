@@ -11,7 +11,7 @@
 
 | 层 | 现状(立项前) | 立项后 |
 |---|---|---|
-| core 纯函数(nutrition/planner/labelScan) | `npm run verify` 160 项(立项时点;现 165,增量见 §10-§12) | **保持不动**(数据一致性护栏) |
+| core 纯函数(nutrition/planner/labelScan) | `npm run verify` 160 项(立项时点;现 174,增量见 §10-§13) | **保持不动**(数据一致性护栏) |
 | data(foods/recipes/tips) | verify 数据一致性断言 | 保持不动 |
 | stores(week/checkin/weight/profile/customFoods) | **零自动化**(评审 v5 F-1 即此盲区实证) | Vitest 单测(P1:week;P2:其余 4 个) |
 | 视图(4 视图 + 6 弹层组件) | 仅人工 IAB 会话,不可重复 | Playwright E2E |
@@ -155,3 +155,9 @@ scripts/verify.mjs  原样保留,不动
 **交付:** `npm test` 四段全绿——verify 165(§32 +2:主食槽频次过滤用餐内累计的合成池断言与无约束对照组)+ unit 65(含 v0.26.0 未入账的 7 项 extraMeals 单测;本次 +1:recentRecipeIds skip 语义,prune 用例原位扩展"仅加餐槽有内容的天保留")+ 功能 E2E 28(+1:场景 12b 仅加餐天计入统计与日历点同口径)+ PWA 1。
 
 **应用侧修复(docs/CODE_REVIEW_v7_2026-10-16.md F-1~F-4,共同主题是 extraMeals 结构键引入后的消费方覆盖缺口):** recentRecipeIds 过滤打卡 skip 的餐,兑现注释承诺(F-1);pruneStaleEmptyDays 的 hasContent 改走 mealLists,仅加餐槽有内容的远期天不再误清(F-2);记录页 dietStats 记录天判定与 recordDays/日历点同口径(F-3);assembleMeal 主食槽频次过滤改用餐内局部计数 localCounts,现库零行为变化、合成池断言固住(F-4)。§4 清单补 recentRecipeIds 行。
+
+## 13. v0.27.0 数据建模三件套落地记录(2026-10-16)
+
+**交付:** `npm test` 四段全绿——verify 174(§33 +9:薯芋南瓜食部 5 条官方核对/紫薯不标、钠全覆盖+油脂零+6 锚点逐位、src 溯源锚点 ≥15 与 5 条挂码、labelScan 钠行解析与每份换算)+ unit 65 + 功能 E2E 28 + PWA 1。§23 红薯锚点 206→185(食部 90% 折算)、口径角标样例山药→黄瓜(山药现带可食部换算角标)。
+
+**三项内容(取舍均入 DECISIONS):** ① 薯芋南瓜食部 5 条官方第 6 版核实补标(土豆 94/红薯 90/山药 83/芋头 84/南瓜 85),紫薯无官方条目不标,存量记录按新口径自动重算(v0.17.0 既有原则);② 钠建模——SODIUM_BY_ID 153 条近似体系+官方锚点,只做食材层展示(食材库/自定义食物带钠),不做全天汇总(烹饪盐不在库内,DECISIONS 登记);labelScan 解析钠行、自定义表单加钠字段(mg/100g);③ src 溯源——SRC_BY_ID 集中块锚点先行 17 条,其余默认近似由 foods.js 头注释声明。

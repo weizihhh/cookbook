@@ -13,7 +13,12 @@ test('场景22:食谱库搜索 + 自定义食物增改删与全链路联动', as
   await expect(page.getByRole('tab', { name: '全部' })).toBeVisible()
   await expect(page.locator('.van-cell', { hasText: '鸡胸' }).first()).toBeVisible()
 
-  // 手动添加自定义食物:每 100g 口径
+  // 食材库行展示钠含量(v0.27.0 钠建模——只做食材层展示,不进全天汇总)
+  await page.locator('.library-search input').fill('')
+  await page.getByRole('tab', { name: '食材库' }).click()
+  await expect(page.locator('.van-cell', { hasText: '芹菜(茎)' })).toContainText('钠159')
+
+  // 手动添加自定义食物:每 100g 口径(含可选钠字段 mg/100g)
   await page.locator('.library-search input').fill('')
   await page.getByRole('tab', { name: '自定义' }).click()
   await page.getByRole('button', { name: '手动添加' }).click()
@@ -23,9 +28,11 @@ test('场景22:食谱库搜索 + 自定义食物增改删与全链路联动', as
   await form.locator('.van-field', { hasText: '蛋白质' }).locator('input').fill('20')
   await form.locator('.van-field', { hasText: '脂肪' }).locator('input').fill('8')
   await form.locator('.van-field', { hasText: '碳水' }).locator('input').fill('35')
+  await form.locator('.van-field', { hasText: '钠' }).locator('input').fill('300')
   await form.getByRole('button', { name: '保存', exact: true }).click()
   await expect(page.getByRole('tab', { name: '自定义(1)' })).toBeVisible()
   await expect(page.locator('.van-cell', { hasText: '测试能量棒' })).toBeVisible()
+  await expect(page.locator('.van-cell', { hasText: '测试能量棒' })).toContainText('钠300')
 
   // 今日页加餐可搜到并加入(基准 100g → 300 千卡计入全天合计)
   await page.goto('/#/today')

@@ -3,6 +3,8 @@
 // (经中国疾控中心营养与健康所食物营养成分查询平台逐条核对),与市售具体
 // 产品有差异,仅供规划参考。
 // edible(食部):市售每 1g 中可食部的比例,带壳贝类/整鱼/鸡翅/带棒玉米等 <1。
+// 薯芋南瓜类 v0.27.0 起按官方第 6 版食部补标(土豆 94/红薯 90/山药 83/芋头 84/南瓜 85);
+// 紫薯无官方独立条目,不标(100% 口径,营养偏高估)。
 // 食谱克数与采购清单均为"市场购买量"口径,营养计算按 grams × edible 折算
 // (官方牡蛎条目按蚝肉计食部 100%,故不标)。未标注 = 100% 可食。
 // 名称限定词((去皮)/(瘦)/(生)/(干)…)只标注官方条目名可核实的口径;
@@ -39,15 +41,15 @@ const RAW_FOODS = [
   { id: 'f_whole_wheat_bread', name: '全麦面包', category: 'grain', kcal: 250, protein: 9.0, carbs: 45.0, fat: 4.0, unit: '片', unitGrams: 35 },
   { id: 'f_steamed_bun', name: '馒头', category: 'grain', kcal: 223, protein: 7.0, carbs: 47.0, fat: 1.1, unit: '个', unitGrams: 100 },
   { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200, edible: 0.46 },
-  { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 103, protein: 1.1, carbs: 24.7, fat: 0.2, unit: '个', unitGrams: 100 },
+  { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 103, protein: 1.1, carbs: 24.7, fat: 0.2, unit: '个', unitGrams: 100, edible: 0.9 },
   { id: 'f_purple_potato', name: '紫薯', category: 'grain', kcal: 82, protein: 1.3, carbs: 18.5, fat: 0.2, unit: '个', unitGrams: 100 },
-  { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2, unit: '个', unitGrams: 100 },
-  { id: 'f_yam', name: '山药', category: 'grain', kcal: 57, protein: 1.9, carbs: 12.4, fat: 0.2 },
-  { id: 'f_pumpkin', name: '南瓜', category: 'grain', kcal: 23, protein: 0.7, carbs: 5.3, fat: 0.1 },
+  { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2, unit: '个', unitGrams: 100, edible: 0.94 },
+  { id: 'f_yam', name: '山药', category: 'grain', kcal: 57, protein: 1.9, carbs: 12.4, fat: 0.2, edible: 0.83 },
+  { id: 'f_pumpkin', name: '南瓜', category: 'grain', kcal: 23, protein: 0.7, carbs: 5.3, fat: 0.1, edible: 0.85 },
   { id: 'f_black_glutinous_rice', name: '紫米(生)', category: 'grain', kcal: 345, protein: 8.3, carbs: 75.0, fat: 1.7 },
   { id: 'f_mung_bean_dry', name: '绿豆(干)', category: 'grain', kcal: 329, protein: 21.6, carbs: 62.0, fat: 0.8 },
   { id: 'f_red_bean_dry', name: '红豆(干)', category: 'grain', kcal: 324, protein: 20.2, carbs: 63.4, fat: 0.6 },
-  { id: 'f_taro', name: '芋头', category: 'grain', kcal: 81, protein: 2.2, carbs: 18.1, fat: 0.2 },
+  { id: 'f_taro', name: '芋头', category: 'grain', kcal: 81, protein: 2.2, carbs: 18.1, fat: 0.2, edible: 0.84 },
   { id: 'f_sorghum', name: '高粱米(生)', category: 'grain', kcal: 351, protein: 10.4, carbs: 74.7, fat: 3.1 },
   { id: 'f_cornmeal', name: '玉米面', category: 'grain', kcal: 350, protein: 8.1, carbs: 73.0, fat: 3.3 },
   { id: 'f_noodles_dry', name: '挂面(干)', category: 'grain', kcal: 348, protein: 10.3, carbs: 74.5, fat: 0.6 },
@@ -266,10 +268,92 @@ const FIBER_BY_ID = {
   f_pistachio: 10.6, f_pumpkin_seed: 6.5,
 }
 
+// 钠(mg/100g 可食部)。近似值体系(与热量/纤维同源口径,成分表/USDA 常见值,
+// 除锚点外未逐条联网核实)。锚点为官方平台/成分表直查:红薯 28.5、土豆 2.7、
+// 南瓜 0.8(平台 foodinfo)、紫菜 710.5(平台 611)、虾皮 5057.7、挂面 184.5(均值)。
+// 用途边界(DECISIONS 登记):膳食钠大头是烹饪加盐,不在食材数据内——只做
+// 食材层展示,不做全天汇总(汇总必系统性低估)。加工品(挂面/面包/豆干等)
+// 市售加盐差异大,取成分表均值;纯油脂生理零钠。维护规则:新增食材必须登记,
+// verify 有覆盖率断言兜底。
+const SODIUM_BY_ID = {
+  // 谷物主食(挂面/馒头/面包为加盐加工品,显著高于原料)
+  f_rice: 2, f_brown_rice: 3, f_millet: 4, f_oats: 3, f_whole_wheat_flour: 2,
+  f_buckwheat_noodle: 180, f_pasta: 5, f_rice_noodle: 30, f_quinoa: 5,
+  f_whole_wheat_bread: 400, f_steamed_bun: 165, f_corn: 2, f_sweet_potato: 28.5,
+  f_purple_potato: 30, f_potato: 2.7, f_yam: 19, f_pumpkin: 0.8,
+  f_black_glutinous_rice: 3, f_mung_bean_dry: 3, f_red_bean_dry: 2, f_taro: 33,
+  f_sorghum: 6, f_cornmeal: 3, f_noodles_dry: 184.5, f_glutinous_rice: 2,
+  // 畜禽肉(内脏偏高)
+  f_chicken_breast: 45, f_chicken_leg: 70, f_chicken_wing: 51, f_beef_lean: 53,
+  f_beef_shank: 50, f_pork_loin: 43, f_pork_leg: 55, f_lamb_lean: 69,
+  f_duck_breast: 65, f_pork_liver: 68, f_chicken_liver: 92, f_beef_brisket: 55,
+  f_pork_ribs: 62, f_beef_tenderloin: 50, f_rabbit: 85,
+  // 鱼虾海鲜(贝类/虾皮显著高)
+  f_salmon: 60, f_cod: 130, f_bass: 140, f_basa: 100, f_hairtail: 150,
+  f_shrimp: 170, f_squid: 110, f_clam: 425, f_tuna_canned: 320,
+  f_dried_small_shrimp: 5057.7, f_razor_clam: 175, f_oyster: 460,
+  f_crucian: 70, f_scallop: 700, f_pomfret: 75,
+  // 蛋奶豆制品(卤制豆制品为加盐加工品)
+  f_egg: 131, f_egg_white: 79, f_milk: 40, f_milk_low_fat: 45,
+  f_yogurt_plain: 40, f_soy_milk: 3, f_tofu_firm: 5, f_tofu_soft: 3,
+  f_tofu_dried: 700, f_soybean_dry: 2, f_chickpea_cooked: 7, f_edamame: 4,
+  f_yuba: 20, f_quail_egg: 115, f_tofu_sheet: 150, f_black_bean_dry: 3,
+  f_cottage_cheese: 40, f_vegetarian_chicken: 600,
+  // 蔬菜菌菇(芹菜茎/空心菜/茼蒿/白萝卜偏高,菌菇海藻干制品浓缩)
+  f_broccoli: 18, f_cauliflower: 30, f_spinach: 85, f_lettuce: 32, f_oleifera: 30,
+  f_chinese_cabbage: 48, f_baby_cabbage: 50, f_celery: 159, f_cucumber: 5,
+  f_tomato: 5, f_bell_pepper: 4, f_asparagus: 3, f_shiitake: 2, f_mushroom: 5,
+  f_enoki: 4, f_king_oyster: 3, f_oyster_mushroom: 4, f_eggplant: 5,
+  f_green_bean: 4, f_okra: 4, f_wax_gourd: 2, f_carrot: 25, f_white_radish: 62,
+  f_chinese_chive: 8, f_cabbage: 27, f_loofah: 3, f_water_spinach: 94,
+  f_zucchini: 5, f_mung_bean_sprout: 4, f_wood_ear: 8, f_kelp: 9, f_laver: 710.5,
+  f_shepherd_s_purse: 31, f_chrysanthemum_greens: 86, f_lotus_root: 44,
+  f_bitter_melon: 3, f_water_bamboo: 5, f_konjac: 50, f_bok_choy: 55,
+  f_celtuce: 36, f_garlic_sprout: 6, f_snow_pea: 4, f_onion: 4,
+  f_green_pepper: 3, f_soybean_sprout: 7, f_amaranth: 32,
+  // 水果(普遍低钠)
+  f_apple: 2, f_banana: 1, f_orange: 1, f_blueberry: 1, f_strawberry: 4,
+  f_kiwi: 10, f_grape: 2, f_pear: 3, f_peach: 2, f_cherry_tomato: 5,
+  f_pomelo: 1, f_watermelon: 3, f_hami_melon: 26, f_cherry: 8,
+  f_fresh_jujube: 1, f_pineapple: 1, f_dragon_fruit: 2, f_lychee: 2,
+  f_avocado: 7, f_mango: 3, f_papaya: 3, f_persimmon: 1, f_mandarin: 1,
+  f_pomegranate: 1,
+  // 油脂坚果(纯油脂零钠;坚果为未加盐原味口径)
+  f_olive_oil: 0, f_peanut_oil: 0, f_flaxseed_oil: 0,
+  f_almond: 8, f_walnut: 2, f_peanut: 4, f_cashew: 12, f_black_sesame: 8,
+  f_pistachio: 10, f_pumpkin_seed: 18,
+}
+
+// 数据溯源:仅登记"数值直接取自官方条目且经逐条核实"的锚点(官方平台
+// nlc.chinanutri.cn / 第 6 版书页/编码);未登记 = 近似口径(本文件头声明)。
+// 否掉全量逐条挂码:库内大量数值为近似/中位/缝合口径,挂码即伪溯源;
+// 升级路径 = 哪条被核实修正,哪条挂码(verify 有锚点下限断言)。
+const SRC_BY_ID = {
+  f_sweet_potato: '第6版 甘薯(红心) · 平台 foodinfo/316',
+  f_potato: '第6版 马铃薯 · 平台 foodinfo/313',
+  f_yam: '第6版 山药(鲜) · 平台 foodinfo/525',
+  f_taro: '第6版 芋头 · 平台 foodinfo/526',
+  f_pumpkin: '第6版 南瓜(鲜) · 编码 04-3-213',
+  f_oats: '第6版 燕麦片(v0.16.3 核对,338 系燕麦粒值已纠正)',
+  f_garlic_sprout: '第6版 蒜薹(v0.16.3 核对,与蒜苗为两个条目)',
+  f_beef_brisket: '第6版 牛腩(v0.16.3 脂肪 29.3 与能量自洽核对)',
+  f_chicken_breast: '第6版 鸡胸肉(v0.16.3 核对,官方未区分去皮)',
+  f_chicken_wing: '第6版 鸡翅 · 书 p881(食部 0.69 / 碳水 4.6)',
+  f_pork_ribs: '第6版 猪小排·肋排(食部 0.72)',
+  f_clam: '第6版 蛤蜊(食部 0.40)',
+  f_razor_clam: '第6版 蛏子 · 书 p1108(食部 0.57)',
+  f_crucian: '第6版 鲫鱼(食部 0.54)',
+  f_shrimp: '第6版 基围虾(食部 0.60)',
+  f_corn: '第6版 玉米(鲜)(食部 0.46)',
+  f_oyster: '第6版 牡蛎(官方条目按蚝肉计,食部 100% 不标 edible)',
+}
+
 export const FOODS = RAW_FOODS.map((f) => ({
   ...f,
   antiInfl: ANTI_INFLAMMATORY_IDS.has(f.id),
   ...(FIBER_BY_ID[f.id] != null ? { fiber: FIBER_BY_ID[f.id] } : {}),
+  sodium: SODIUM_BY_ID[f.id],
+  ...(SRC_BY_ID[f.id] ? { src: SRC_BY_ID[f.id] } : {}),
 }))
 
 export const FOODS_MAP = Object.fromEntries(FOODS.map((f) => [f.id, f]))
