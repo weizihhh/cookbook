@@ -381,10 +381,13 @@ function save(silent = false) {
 }
 
 // 自动保存:任何调整(滑块/模式/排除项等)静默持久化,切页不再丢失;
-// "保存设置"按钮保留,作为带反馈的显式确认入口
+// "保存设置"按钮保留,作为带反馈的显式确认入口。
+// 未配置档案时不自动保存:挂载时的组件初始化回写(恢复默认 reload 回本页即此场景)
+// 会把 configured 拍回 true,引导态永远不回归;完成过一次显式保存后自动保存才接管
 watch(
   () => [JSON.stringify({ ...form }), manualKcalInput.value, splitInputs.value.join(',')],
   () => {
+    if (!profile.isConfigured) return
     if (form.age && form.height && form.weight) save(true)
   }
 )

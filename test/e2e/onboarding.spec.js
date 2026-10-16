@@ -1,6 +1,6 @@
 // 场景 1-2:首次引导态 + 默认档案公式链精确断言(TEST_PLAN §3)
 import { test, expect } from '@playwright/test'
-import { ANCHOR } from './helpers'
+import { ANCHOR, injectState, DEFAULT_PROFILE } from './helpers'
 
 test('场景1:未配置显示引导态,"去设置"直达档案页', async ({ page }) => {
   await page.goto('/#/today')
@@ -35,4 +35,15 @@ test('场景2:默认档案公式链——设置页预览与今日页目标卡均
   await expect(page.locator('.metric-row', { hasText: '蛋白质' }).locator('.metric-val')).toHaveText(
     `0 / ${ANCHOR.protein} g`
   )
+})
+
+test('场景2b:已配置档案改表单不点保存也生效(自动保存仅对已配置用户接管)', async ({ page }) => {
+  await injectState(page, { profile: DEFAULT_PROFILE })
+  await page.goto('/#/profile')
+  // 改体重 70 → 75,不点"保存设置"直接切页
+  await page.getByPlaceholder('kg', { exact: true }).fill('75')
+  await page.waitForTimeout(300) // 静默自动保存(watch 微任务)落盘
+  await page.goto('/#/today')
+  // 75kg 手算:BMR 1698.75 → TDEE 2335.78 → cut-17% → 1939 千卡
+  await expect(page.locator('.kcal-target')).toHaveText('目标 1939 千卡')
 })

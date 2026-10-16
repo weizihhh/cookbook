@@ -134,4 +134,5 @@ scripts/verify.mjs  原样保留,不动
 - 场景 12"点昨天"假设昨天在当前显示月,跨月首日(每月 1 号)跑会失败——届时先修该步或跳过
 
 **P1 期发现 bug 清单(只测不修,待用户拍板):**
-- **B-1(体验级)**:恢复默认后页面 reload 回 /#/profile,ProfileView 自动保存 watch 立即触发 `profile.update()`,configured 被写回 true → 引导态不再出现(数据确已全清,无数据风险)。backup.spec 相应断言已移到 localStorage 层;修复后应恢复引导态 UI 断言。
+- ~~**B-1(体验级)**:恢复默认后页面 reload 回 /#/profile,ProfileView 自动保存 watch 立即触发 `profile.update()`,configured 被写回 true → 引导态不再出现(数据确已全清,无数据风险)。backup.spec 相应断言已移到 localStorage 层;修复后应恢复引导态 UI 断言。~~
+  **已修复(v0.24.1,2026-10-15)**:自动保存 watch 加 `profile.isConfigured` guard——未配置档案时不自动保存,`configured: true` 的唯一入口是显式点"保存设置"(新用户首次需点一次保存,换取"恢复默认→引导态"语义正确)。backup.spec 已恢复引导态 UI 断言,另增场景 2b(已配置用户改体重不点保存切页仍生效,75kg→1939 千卡)守护 v0.16.3 自动保存语义不回归。

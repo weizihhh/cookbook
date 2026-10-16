@@ -33,14 +33,16 @@ test('场景13+14:导出备份→恢复默认全清→导入恢复数据', async
   await page.evaluate(() => (window.__oldDoc = 1))
   await page.getByRole('button', { name: '确认' }).click()
   await waitReloadDone(page)
-  // 数据层断言:餐单/打卡全清(已知 bug B-1:reload 落在 /#/profile 时自动保存会把
-  // configured 拍回 true,引导态不回归——数据确已清空,故断言移到 localStorage 层)
+  // 数据层:餐单/打卡全清
   const cleared = await page.evaluate(() => ({
     week: JSON.parse(localStorage.getItem('cookbook:week') || '{}'),
     checkin: JSON.parse(localStorage.getItem('cookbook:checkin') || '{}'),
   }))
   expect(Object.keys(cleared.week.days || {})).toHaveLength(0)
   expect(Object.keys(cleared.checkin.marks || {})).toHaveLength(0)
+  // UI 层:回到引导态(B-1 修复前,自动保存会在 reload 后把 configured 拍回 true)
+  await page.goto('/#/today')
+  await expect(page.getByText('先完善身体数据,才能计算你的每日热量与营养目标')).toBeVisible()
 
   // 导入:filechooser + 确认覆盖 → reload 后数据恢复
   await page.goto('/#/profile')
