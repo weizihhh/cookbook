@@ -36,6 +36,18 @@ export const ANCHOR = {
 // 白米饭(r_rice)基准份 70g 生米的营养(computeNutrition 后:f_rice 346kcal/7.4P 每 100g)
 export const RICE = { kcal: 242, item: () => ({ recipeId: 'r_rice', slot: 'staple', ingredients: [{ foodId: 'f_rice', grams: 70, scalable: true }] }) }
 
+// 全麦面包片 70g:f_whole_wheat_bread 250kcal/纤维 6.0 每 100g → 175 千卡/纤维 4.2g
+export const BREAD = {
+  kcal: 175,
+  fiber: 4.2,
+  item: () => ({ recipeId: 'r_whole_wheat_bread_slice', slot: 'staple', ingredients: [{ foodId: 'f_whole_wheat_bread', grams: 70, scalable: true }] }),
+}
+
+// 爆炒猪肝(r_stir_fried_pork_liver,蛋白槽 午/晚):f_pork_liver weeklyLimit=1
+export const PORK_LIVER = {
+  item: () => ({ recipeId: 'r_stir_fried_pork_liver', slot: 'protein', ingredients: [{ foodId: 'f_pork_liver', grams: 100, scalable: true }] }),
+}
+
 /** 注入 localStorage 状态(须在 page.goto 前调用;同一 page 可多次调用,按调用序叠加)。
  *  week/checkin 数据中的 __TODAY__/__YESTERDAY__ 占位符在浏览器侧替换为真实日期,
  *  测试代码无需关心今天是几号。
@@ -44,8 +56,8 @@ export const RICE = { kcal: 242, item: () => ({ recipeId: 'r_rice', slot: 'stapl
  *  哨兵按调用序号独立(支持 beforeEach+testBody 两段注入),key 不带 cookbook:
  *  前缀,不会被应用读写、不会进备份文件 */
 let injectSeq = 0
-export async function injectState(page, { profile, week, checkin } = {}) {
-  const state = { __seq: ++injectSeq, profile, week, checkin }
+export async function injectState(page, { profile, week, checkin, weight } = {}) {
+  const state = { __seq: ++injectSeq, profile, week, checkin, weight }
   await page.addInitScript((s) => {
     const guardKey = `__e2e_inj_${s.__seq}`
     if (localStorage.getItem(guardKey)) return
@@ -60,6 +72,7 @@ export async function injectState(page, { profile, week, checkin } = {}) {
     if (s.profile) localStorage.setItem('cookbook:profile', JSON.stringify(patch(s.profile)))
     if (s.week) localStorage.setItem('cookbook:week', JSON.stringify(patch(s.week)))
     if (s.checkin) localStorage.setItem('cookbook:checkin', JSON.stringify(patch(s.checkin)))
+    if (s.weight) localStorage.setItem('cookbook:weight', JSON.stringify(patch(s.weight)))
     localStorage.setItem(guardKey, '1')
   }, state)
 }

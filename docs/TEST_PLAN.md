@@ -136,3 +136,15 @@ scripts/verify.mjs  原样保留,不动
 **P1 期发现 bug 清单(只测不修,待用户拍板):**
 - ~~**B-1(体验级)**:恢复默认后页面 reload 回 /#/profile,ProfileView 自动保存 watch 立即触发 `profile.update()`,configured 被写回 true → 引导态不再出现(数据确已全清,无数据风险)。backup.spec 相应断言已移到 localStorage 层;修复后应恢复引导态 UI 断言。~~
   **已修复(v0.24.1,2026-10-15)**:自动保存 watch 加 `profile.isConfigured` guard——未配置档案时不自动保存,`configured: true` 的唯一入口是显式点"保存设置"(新用户首次需点一次保存,换取"恢复默认→引导态"语义正确)。backup.spec 已恢复引导态 UI 断言,另增场景 2b(已配置用户改体重不点保存切页仍生效,75kg→1939 千卡)守护 v0.16.3 自动保存语义不回归。
+
+## 11. P2 落地记录(2026-10-15,v0.25.0)
+
+**交付:** `npm test` 全绿——verify 160 + unit 57(+26:checkin/weight/profile/customFoods 四个 store 全量)+ 功能 E2E 26(+9:场景 16-24)+ PWA 1。P2 期未发现新的应用缺陷。
+
+**场景 16-24:** 模板 UI 全链路(存/套/删)、推荐一餐(入口区间→候选→采纳写入晚餐→入口消失)、体重趋势+半动态(74kg 均值→1927 千卡+设置页说明)、纤维行(全麦面包片 4.2g/还差 21g)、排除过滤(勾麸质生成无麸质)、频次提示(猪肝达上限红字不阻断)、食谱库+自定义食物全链路(增改删→加餐引用联动清理)、贴士折叠(v0.7.0 P1 bug 回归护栏)+每日一读、模式→预设→目标三层联动(增肌 1.8g/kg + 预览 126g)。
+
+**P2 期 E2E 新增经验:**
+- Vant4 tab 标题 class 是 `.van-tab`(无 `.van-tabs__tab`),role 定位 `getByRole('tab')` 最稳
+- picker 选项 class 是 `.van-picker-column__item`(双下划线);picker 有默认确认栏
+- readonly van-field(模式/预设/活动量)点击 `.van-field__label` 冒泡触发比点 field 根稳
+- 设置页同名 cell(营养细节"蛋白质"vs 预览区"蛋白质")用 `.first()` 消歧,页面区块顺序:身体数据→目标→营养细节→偏好→预览
