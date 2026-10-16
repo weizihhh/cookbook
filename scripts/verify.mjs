@@ -944,6 +944,10 @@ check('weeklyLimit 配置均有食谱引用(死配置预警)', orphanLimits.leng
   const badEdible = Object.entries(edibleExpect).filter(([id, v]) => FOODS_MAP[id]?.edible !== v)
   check('薯芋南瓜食部按官方第6版标注(5条)', badEdible.length === 0, badEdible.map(([id]) => id).join(','))
   check('紫薯无官方条目不标食部(100%口径,诚实原则优先)', !('edible' in (FOODS_MAP['f_purple_potato'] || {})))
+  // v0.27.1 数据修正锚点:马铃薯按平台 foodinfo/313 对齐(旧值 81/2.6/17.8 系镜像站污染,
+  // 平台与 USDA 生薯一致为 78/2.0/17.2);100g 购买量按食部 94% 折算
+  const potatoN = computeNutrition([{ foodId: 'f_potato', grams: 100 }], FOODS_MAP)
+  check('土豆对齐平台条目:100g 购买量(食部94%)= 73 千卡 / 蛋白 1.9g(v0.27.1 纠正)', potatoN.kcal === 73 && potatoN.protein === 1.9, `got ${potatoN.kcal}/${potatoN.protein}`)
 }
 // 钠:全覆盖(纯油脂=0);官方/成分表锚点逐位固定(防近似值体系数量级手误)
 {

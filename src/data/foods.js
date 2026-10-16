@@ -43,7 +43,7 @@ const RAW_FOODS = [
   { id: 'f_corn', name: '玉米(鲜)', category: 'grain', kcal: 112, protein: 4.0, carbs: 22.8, fat: 1.2, unit: '根', unitGrams: 200, edible: 0.46 },
   { id: 'f_sweet_potato', name: '红薯', category: 'grain', kcal: 103, protein: 1.1, carbs: 24.7, fat: 0.2, unit: '个', unitGrams: 100, edible: 0.9 },
   { id: 'f_purple_potato', name: '紫薯', category: 'grain', kcal: 82, protein: 1.3, carbs: 18.5, fat: 0.2, unit: '个', unitGrams: 100 },
-  { id: 'f_potato', name: '土豆', category: 'grain', kcal: 81, protein: 2.6, carbs: 17.8, fat: 0.2, unit: '个', unitGrams: 100, edible: 0.94 },
+  { id: 'f_potato', name: '土豆', category: 'grain', kcal: 78, protein: 2.0, carbs: 17.2, fat: 0.2, unit: '个', unitGrams: 100, edible: 0.94 },
   { id: 'f_yam', name: '山药', category: 'grain', kcal: 57, protein: 1.9, carbs: 12.4, fat: 0.2, edible: 0.83 },
   { id: 'f_pumpkin', name: '南瓜', category: 'grain', kcal: 23, protein: 0.7, carbs: 5.3, fat: 0.1, edible: 0.85 },
   { id: 'f_black_glutinous_rice', name: '紫米(生)', category: 'grain', kcal: 345, protein: 8.3, carbs: 75.0, fat: 1.7 },
@@ -330,7 +330,7 @@ const SODIUM_BY_ID = {
 // 升级路径 = 哪条被核实修正,哪条挂码(verify 有锚点下限断言)。
 const SRC_BY_ID = {
   f_sweet_potato: '第6版 甘薯(红心) · 平台 foodinfo/316',
-  f_potato: '第6版 马铃薯 · 平台 foodinfo/313',
+  f_potato: '第6版 马铃薯 · 平台 foodinfo/313(v0.27.1 按平台纠正:2.6/17.8/81 为镜像站污染,平台与 USDA 生薯一致为 2.0/17.2/78)',
   f_yam: '第6版 山药(鲜) · 平台 foodinfo/525',
   f_taro: '第6版 芋头 · 平台 foodinfo/526',
   f_pumpkin: '第6版 南瓜(鲜) · 编码 04-3-213',
