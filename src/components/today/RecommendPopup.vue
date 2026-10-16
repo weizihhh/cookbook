@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { SLOT_LABELS, computeNutrition, recommendMeals, recentFoodDays } from '../../core/planner'
+import { SLOT_LABELS, computeNutrition, recommendMeals, recentFoodCounts } from '../../core/planner'
 import { FOODS_MAP, formatFoodAmount } from '../../data/foods'
 import { RECIPES, RECIPES_MAP } from '../../data/recipes'
 import { useWeekStore } from '../../stores/week'
@@ -68,7 +68,7 @@ function generate() {
     protein: props.remaining.protein,
     mealKey: 'dinner',
     excludedTags: profile.excludedTags,
-    foodDayCounts: recentFoodDays(week.days, today.value),
+    foodDayCounts: recentFoodCounts(week.days, today.value),
   })
   candidates.value = lists.map((items) => {
     let kcal = 0
